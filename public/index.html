@@ -58,6 +58,13 @@
   .note { font-size: 12px; color: var(--sub); background: #faf6ef; border: 1px solid #f0e2c8; padding: 8px 10px; border-radius: 8px; margin-top: 10px; }
   .disclaim { font-size: 12px; color: var(--sub); margin-top: 14px; border-top: 1px dashed var(--line); padding-top: 10px; }
   code { background: #f0f1f3; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  /* 命盘明细表：由排盘数据确定性渲染，结构永远正确（5 列：项目+年/月/日/时柱） */
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 12px 0; }
+  .ming-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .ming-table th, .ming-table td { border: 1px solid var(--line); padding: 6px 8px; text-align: center; vertical-align: middle; }
+  .ming-table th { background: #f3f4f6; font-weight: 700; color: var(--ink); border-bottom: 2px solid var(--brand); }
+  .ming-table td.rh { background: #fafafa; font-weight: 600; color: var(--sub); text-align: left; }
+  .ming-table td.daycell { color: var(--brand); font-weight: 700; }
 
   /* === 移动端适配（≤600px） === */
   @media (max-width: 600px) {
@@ -80,6 +87,8 @@
     .pillars { gap: 8px; }
     .meta { font-size: 12px; }
     .report { font-size: 14px; line-height: 1.8; }
+    .ming-table { font-size: 12px; }
+    .ming-table th, .ming-table td { padding: 5px 6px; }
   }
   @media (max-width: 360px) {
     .pillars { grid-template-columns: repeat(2, 1fr); }
@@ -171,6 +180,7 @@ function render(j) {
     html += `<div class="pillar"><div class="ttl">${p[0]}</div><div class="gz">${p[1]}</div><div class="tg">${p[2]}</div></div>`;
   });
   html += '</div>';
+  html += buildMingTable(c);
   html += `<div class="meta">日主（命主）：<b>${c.dayMaster}</b> ｜ 真太阳时：<b>${c.trueSolarTime.corrected}</b>（${c.trueSolarTime.note}）｜ 起运：<b>${c.daYun.startAge}</b>（${c.daYun.direction}）</div>`;
   if (c.currentLiuNian) {
     html += `<div class="meta">当前流年：<b>${c.currentLiuNian.ganZhi}</b>（${c.currentLiuNian.year} 年，约 ${c.currentLiuNian.age} 岁，处大运 ${c.currentLiuNian.inDayun || '外'}）</div>`;
@@ -187,6 +197,24 @@ function render(j) {
     html += `<div class="card"><div class="meta">原始命盘 JSON：</div><pre style="font-size:11px;overflow:auto;max-height:280px">${escapeHtml(JSON.stringify(c, null, 2))}</pre></div>`;
   }
   document.getElementById('result').innerHTML = html;
+}
+
+function buildMingTable(c) {
+  const cols = ['year', 'month', 'day', 'time'];
+  const head = '<thead><tr><th>项目</th>' +
+    cols.map(k => `<th>${k === 'year' ? '年柱' : k === 'month' ? '月柱' : k === 'day' ? '日柱' : '时柱'}</th>`).join('') +
+    '</tr></thead>';
+  const row = (label, vals) => '<tr><td class="rh">' + label + '</td>' +
+    cols.map((k, idx) => `<td${idx === 2 ? ' class="daycell"' : ''}>${vals[k] != null ? vals[k] : ''}</td>`).join('') + '</tr>';
+  const body = '<tbody>'
+    + row('天干', { year: c.chart.year[0], month: c.chart.month[0], day: c.chart.day[0], time: c.chart.time[0] })
+    + row('地支', { year: c.chart.year[1], month: c.chart.month[1], day: c.chart.day[1], time: c.chart.time[1] })
+    + row('十神', c.tenGods)
+    + row('藏干', c.hiddenGan)
+    + row('纳音', c.naYin)
+    + row('旬空', c.xunKong)
+    + '</tbody>';
+  return '<div class="table-scroll"><table class="ming-table">' + head + body + '</table></div>';
 }
 
 function escapeHtml(s) {
