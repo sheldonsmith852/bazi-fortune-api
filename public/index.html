@@ -71,7 +71,7 @@
       </div>
       <div>
         <label>出生时间（24 小时）</label>
-        <input id="time" type="time" />
+        <input id="time" type="time" value="00:00" />
       </div>
       <div>
         <label>性别</label>
@@ -83,8 +83,8 @@
       </div>
     </div>
     <label>出生城市（用于真太阳时，可留空按北京）</label>
-    <input id="city" type="text" placeholder="如 黄石 / 上海 / 北京" />
-    <div class="opt">精确可选填经纬度：<input id="lng" type="text" placeholder="经度 如 115.05" style="display:inline-block;width:120px;margin-right:8px" /> <input id="lat" type="text" placeholder="纬度 如 30.20" style="display:inline-block;width:120px" /></div>
+    <input id="city" type="text" placeholder="如 北京 / 上海 / 广州" />
+    <div class="opt">精确可选填经纬度：<input id="lng" type="text" placeholder="经度 如 116.40" style="display:inline-block;width:120px;margin-right:8px" /> <input id="lat" type="text" placeholder="纬度 如 39.90" style="display:inline-block;width:120px" /></div>
     <button id="go" onclick="submitForm()">排盘并解读</button>
     <div id="err" class="err"></div>
   </div>
