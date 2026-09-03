@@ -67,22 +67,23 @@
     <div class="row">
       <div>
         <label>出生日期（公历）</label>
-        <input id="date" type="date" value="1999-06-15" />
+        <input id="date" type="date" value="2000-01-01" />
       </div>
       <div>
         <label>出生时间（24 小时）</label>
-        <input id="time" type="time" value="10:30" />
+        <input id="time" type="time" />
       </div>
       <div>
         <label>性别</label>
         <select id="gender">
+          <option value="" disabled selected>请选择</option>
           <option value="male">男</option>
           <option value="female">女</option>
         </select>
       </div>
     </div>
     <label>出生城市（用于真太阳时，可留空按北京）</label>
-    <input id="city" type="text" placeholder="如 黄石 / 上海 / 北京" value="黄石" />
+    <input id="city" type="text" placeholder="如 黄石 / 上海 / 北京" />
     <div class="opt">精确可选填经纬度：<input id="lng" type="text" placeholder="经度 如 115.05" style="display:inline-block;width:120px;margin-right:8px" /> <input id="lat" type="text" placeholder="纬度 如 30.20" style="display:inline-block;width:120px" /></div>
     <button id="go" onclick="submitForm()">排盘并解读</button>
     <div id="err" class="err"></div>
@@ -106,6 +107,7 @@ function submitForm() {
     lat: document.getElementById('lat').value.trim() || undefined
   };
   if (!payload.date || !payload.time) { errEl.textContent = '请填好日期和时间'; return; }
+  if (!payload.gender) { errEl.textContent = '请选择性别'; return; }
   btn.disabled = true; btn.textContent = '排盘中…';
   resEl.innerHTML = '<div class="loading">正在排盘并请 AI 撰写解读，请稍候（约 5–15 秒）…</div>';
 
