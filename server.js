@@ -63,11 +63,14 @@ function buildUserMessage(chart) {
     `真太阳时校正后：${c.trueSolarTime.corrected}（${c.trueSolarTime.note}）\n` +
     `四柱：年[${c.chart.year}] 月[${c.chart.month}] 日[${c.chart.day}] 时[${c.chart.time}]，日主=${c.dayMaster}\n` +
     `十神：年[${c.tenGods.year}] 月[${c.tenGods.month}] 日[${c.tenGods.day}] 时[${c.tenGods.time}]\n` +
+    `★五行个数（引擎已算好，直接引用）：天干4+地支4 = ${JSON.stringify(c.wuXing.count)}；含藏干口径 = ${JSON.stringify(c.wuXing.countWithHidden)}\n` +
+    `★配偶星（引擎已算好，直接引用，禁止自行另找星或改称）：${c.spouseStar.gender}｜${c.spouseStar.summary}\n` +
+    `★日主旺衰（引擎已算好，直接引用，禁止自行另判）：结论=${c.strength.verdict}（评分${c.strength.score}）｜${c.strength.deLing.note}；${c.strength.deDi.note}；${c.strength.deShi.note}\n` +
     `纳音：年[${c.naYin.year}] 月[${c.naYin.month}] 日[${c.naYin.day}] 时[${c.naYin.time}]\n` +
     `大运：起运${c.daYun.startAge}，${c.daYun.direction}（${c.daYun.directionNote}），起运约${c.daYun.startSolar}\n` +
     `当前大运序列（前3步）：${c.daYun.list.slice(0, 3).map(d => `${d.ganZhi}(${d.startAge}-${d.endAge}岁)`).join('，')}\n` +
     (c.currentLiuNian ? `当前流年：${c.currentLiuNian.ganZhi}（${c.currentLiuNian.year}年，约${c.currentLiuNian.age}岁，处${c.currentLiuNian.inDayun || '大运外'}）` : '当前流年：未计算');
-  return `以下是用户的八字命盘（已排好，请勿修改其中任何数字）。请严格依据你的系统提示词中【命理方法论参考资料】来撰写大白话解读报告，特别是取用神要走【参考资料·取用神】的法则、格局/十神/六亲/冲合均须引用对应篇章规则，不要凭通用知识发挥：\n\n` +
+  return `以下是用户的八字命盘（已排好，请勿修改其中任何数字）。请严格依据你的系统提示词中【命理方法论参考资料】来撰写大白话解读报告，特别是取用神要走【参考资料·取用神】的法则、格局/十神/六亲/冲合均须引用对应篇章规则，不要凭通用知识发挥。\n【重要】摘要中标 ★ 的三个字段（五行个数、配偶星、日主旺衰）由排盘引擎确定性算好，属于既定事实：你必须直接引用其数值与结论，不得另行推算、不得改写、不得写出与之相反的判断；五行生克关系也不得写反。\n\n` +
     `【命盘摘要】\n${summary}\n\n【原始命盘 JSON】\n${JSON.stringify(chart, null, 2)}`;
 }
 
@@ -79,7 +82,7 @@ async function getInterpretation(chart) {
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: buildUserMessage(chart) }
     ],
-    temperature: 0.7,
+    temperature: 0.25,
     max_tokens: 4095
   });
   return resp.choices[0].message.content;

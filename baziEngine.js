@@ -32,6 +32,164 @@ const CITY_LNG = {
 
 const YANG_GAN = new Set(['甲', '丙', '戊', '庚', '壬']);
 
+// === 五行 / 十神 / 旺衰基础表 ===
+// 目的：把「数五行、找配偶星、判旺衰」这些推理步骤前移到引擎做确定性计算，
+// 让 LLM 只负责翻译成大白话，避免小模型自行推算时把财星叫成官星一类的错误。
+const GAN_INFO = {
+  '甲': ['木', '阳'], '乙': ['木', '阴'],
+  '丙': ['火', '阳'], '丁': ['火', '阴'],
+  '戊': ['土', '阳'], '己': ['土', '阴'],
+  '庚': ['金', '阳'], '辛': ['金', '阴'],
+  '壬': ['水', '阳'], '癸': ['水', '阴']
+};
+const ZHI_WX = {
+  '寅': '木', '卯': '木', '巳': '火', '午': '火',
+  '申': '金', '酉': '金', '亥': '水', '子': '水',
+  '辰': '土', '戌': '土', '丑': '土', '未': '土'
+};
+const WX_SHENG = { '木': '火', '火': '土', '土': '金', '金': '水', '水': '木' };
+const WX_KE = { '木': '土', '土': '水', '水': '火', '火': '金', '金': '木' };
+const PILLAR_NAME = { year: '年', month: '月', day: '日', time: '时' };
+const HIDDEN_LEVEL = ['本气', '中气', '余气'];
+
+/** 十神：以日主天干 dm 看目标天干 t（口径与库的 getXxxShiShenGan 一致，已用多组样例校验） */
+function shiShenOf(dm, t) {
+  if (!GAN_INFO[dm] || !GAN_INFO[t]) return '';
+  if (dm === t) return '比肩';
+  const [wA, yA] = GAN_INFO[dm];
+  const [wB, yB] = GAN_INFO[t];
+  const same = (yA === yB);
+  if (wA === wB) return same ? '比肩' : '劫财';
+  if (WX_SHENG[wA] === wB) return same ? '食神' : '伤官';
+  if (WX_KE[wA] === wB) return same ? '偏财' : '正财';
+  if (WX_SHENG[wB] === wA) return same ? '偏印' : '正印';
+  if (WX_KE[wB] === wA) return same ? '七杀' : '正官';
+  return '';
+}
+
+/** 五行个数：count=天干4字+地支五行4字；countWithHidden 再加全部藏干 */
+function buildWuXing(chart, hidden) {
+  const zero = { 木: 0, 火: 0, 土: 0, 金: 0, 水: 0 };
+  const count = { ...zero };
+  const countWithHidden = { ...zero };
+  const detail = { gan: [], zhi: [], zhiWx: [] };
+  ['year', 'month', 'day', 'time'].forEach(k => {
+    const gan = chart[k][0], zhi = chart[k][1];
+    detail.gan.push(gan); detail.zhi.push(zhi);
+    count[GAN_INFO[gan][0]] += 1;
+    countWithHidden[GAN_INFO[gan][0]] += 1;
+    const zw = ZHI_WX[zhi];
+    detail.zhiWx.push(zw);
+    count[zw] += 1;
+    (hidden[k] || []).forEach(hg => { countWithHidden[GAN_INFO[hg][0]] += 1; });
+  });
+  return {
+    count, countWithHidden, detail,
+    note: 'count=天干4字+地支五行4字（共8）；countWithHidden=天干4字+全部藏干。两种口径都不含纳音与旬空。'
+  };
+}
+
+/** 配偶星：男命取财星（我克者），女命取官杀（克我者），并标出四柱天干与藏干落点 */
+function buildSpouseStar(dm, gender, chart, hidden) {
+  const isMale = (gender === 1);
+  const mainStar = isMale ? '正财' : '正官';
+  const secStar = isMale ? '偏财' : '七杀';
+  const ganList = Object.keys(GAN_INFO);
+  const mainGan = ganList.filter(g => shiShenOf(dm, g) === mainStar);
+  const secGan = ganList.filter(g => shiShenOf(dm, g) === secStar);
+  const hits = [];
+  ['year', 'month', 'day', 'time'].forEach(k => {
+    const gan = chart[k][0], zhi = chart[k][1];
+    const ss = shiShenOf(dm, gan);
+    if (ss === mainStar || ss === secStar) {
+      hits.push({ pillar: PILLAR_NAME[k] + '干', gan, star: ss, level: '天干' });
+    }
+    (hidden[k] || []).forEach((hg, i) => {
+      const s2 = shiShenOf(dm, hg);
+      if (s2 === mainStar || s2 === secStar) {
+        hits.push({ pillar: PILLAR_NAME[k] + '支', zhi, gan: hg, star: s2, level: HIDDEN_LEVEL[i] || '余气' });
+      }
+    });
+  });
+  const cnt = {};
+  cnt[mainStar] = 0; cnt[secStar] = 0;
+  hits.forEach(h => { cnt[h.star] = (cnt[h.star] || 0) + 1; });
+  const hasMix = cnt[mainStar] > 0 && cnt[secStar] > 0;
+  const where = hits.map(h =>
+    `${h.pillar}${h.zhi ? '(' + h.zhi + ')' : ''}${h.level === '天干' ? '' : h.level}${h.gan}${h.star}`).join('、');
+  const mixNote = hasMix
+    ? `【${isMale ? '财星' : '官杀'}混杂：${mainStar}与${secStar}同时出现】`
+    : `【不构成${isMale ? '财星' : '官杀'}混杂：${cnt[mainStar] > 0 ? '仅见' + mainStar : cnt[secStar] > 0 ? '仅见' + secStar : '两者皆无'}】`;
+  return {
+    gender: isMale ? '男命' : '女命',
+    rule: isMale
+      ? '男命以财星为妻星（我克者）：正财为正妻，偏财为偏缘／异性缘'
+      : '女命以官杀为夫星（克我者）：正官为正夫，七杀为压力／偏缘',
+    mainStar, mainGan, secStar, secGan, hits, count: cnt, hasMix,
+    summary: hits.length
+      ? `${isMale ? '妻星' : '夫星'}落点：${mainStar}（${mainGan.join('')}）${cnt[mainStar]} 处、` +
+        `${secStar}（${secGan.join('')}）${cnt[secStar]} 处；明细：${where}。${mixNote}`
+      : `四柱天干与藏干中均未见${mainStar}（${mainGan.join('')}）与${secStar}（${secGan.join('')}）`,
+    note: '由引擎按日主天干与性别确定性推算；解读时请直接引用，不得另找星或改称，且 hasMix=false 时不得说"混杂"'
+  };
+}
+
+/** 日主旺衰：得令（月令）／得地（四支根气）／得势（天干生扶），附简化评分 */
+function buildStrength(dm, chart, hidden) {
+  const wA = GAN_INFO[dm][0];
+  const monthZhi = chart.month[1];
+  const mw = ZHI_WX[monthZhi];
+  let lingState, lingScore;
+  if (mw === wA) { lingState = '旺（月令同五行）'; lingScore = 3; }
+  else if (WX_SHENG[mw] === wA) { lingState = '相（月令生我）'; lingScore = 2; }
+  else if (WX_SHENG[wA] === mw) { lingState = '休（我生月令）'; lingScore = 0; }
+  else if (WX_KE[wA] === mw) { lingState = '囚（我克月令）'; lingScore = 0; }
+  else { lingState = '死（月令克我）'; lingScore = 0; }
+
+  const roots = [];
+  ['year', 'month', 'day', 'time'].forEach(k => {
+    const zhi = chart[k][1];
+    (hidden[k] || []).forEach((hg, i) => {
+      if (GAN_INFO[hg][0] === wA) {
+        roots.push({ pillar: PILLAR_NAME[k] + '支', zhi, gan: hg, level: HIDDEN_LEVEL[i] || '余气' });
+      }
+    });
+  });
+  const helpers = [];
+  ['year', 'month', 'time'].forEach(k => {
+    const gan = chart[k][0];
+    const ss = shiShenOf(dm, gan);
+    if (['比肩', '劫财', '正印', '偏印'].indexOf(ss) >= 0) {
+      helpers.push({ pillar: PILLAR_NAME[k] + '干', gan, star: ss });
+    }
+  });
+  const diScore = roots.reduce((s, r) => s + (r.level === '本气' ? 2 : 1), 0);
+  const shiScore = helpers.length;
+  const score = lingScore + diScore + shiScore;
+  const verdict = score >= 6 ? '偏强' : (score <= 3 ? '偏弱' : '中和');
+  return {
+    dayMaster: dm, dayMasterWx: wA,
+    deLing: {
+      value: lingScore > 0, monthZhi, monthWx: mw, state: lingState,
+      note: `月令${monthZhi}（${mw}），日主${dm}（${wA}）：${lingState}`
+    },
+    deDi: {
+      value: roots.length > 0, roots,
+      note: roots.length
+        ? '四支藏干中的日主根气：' + roots.map(r => `${r.pillar}${r.zhi}·${r.level}${r.gan}`).join('、')
+        : '四支藏干中无日主同五行根气'
+    },
+    deShi: {
+      value: shiScore > 0, helpers,
+      note: shiScore
+        ? '年／月／时干中的生扶：' + helpers.map(h => `${h.pillar}${h.gan}（${h.star}）`).join('、')
+        : '年／月／时干中无比劫印绶生扶'
+    },
+    score, verdict,
+    note: `得令(${lingScore}) + 得地(${diScore}) + 得势(${shiScore}) = ${score}；判定阈值 ≥6 偏强、≤3 偏弱、其余中和。此评分为本引擎简化模型，各流派权重不同，仅供参考。`
+  };
+}
+
 function pad(n) { return String(n).padStart(2, '0'); }
 
 // === 真太阳时 ===
@@ -167,6 +325,10 @@ function computeBazi(input) {
     }
   } catch (e) { currentLiuNian = null; }
 
+  // 7) 确定性衍生字段（五行个数 / 配偶星 / 日主旺衰）：由引擎算好，不让 LLM 自行推算
+  const chartGZ = { year: yearGZ, month: monthGZ, day: dayGZ, time: timeGZ };
+  const dmGan = ec.getDayGan();
+
   return {
     input: { date: opts.date, time: opts.time, gender: opts.gender, city: opts.city || null, lng, lat },
     trueSolarTime: {
@@ -174,7 +336,10 @@ function computeBazi(input) {
       corrected: `${tst.year}-${pad(tst.month)}-${pad(tst.day)} ${pad(tst.hour)}:${pad(tst.minute)}`,
       note: `相对北京时（120E）${tst.diffMin >= 0 ? '+' : ''}${tst.diffMin} 分钟`
     },
-    dayMaster: ec.getDayGan(),
+    dayMaster: dmGan,
+    wuXing: buildWuXing(chartGZ, hidden),
+    spouseStar: buildSpouseStar(dmGan, gender, chartGZ, hidden),
+    strength: buildStrength(dmGan, chartGZ, hidden),
     chart: {
       year: yearGZ,
       month: monthGZ,
@@ -226,4 +391,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { computeBazi };
+module.exports = { computeBazi, shiShenOf, buildWuXing, buildSpouseStar, buildStrength, GAN_INFO, ZHI_WX };
