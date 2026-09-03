@@ -139,7 +139,7 @@ function computeBazi(input) {
     startAge: da.getStartAge(),
     endAge: da.getEndAge(),
     ganZhi: da.getGanZhi() || '童限（起运前）'
-  }));
+  })).filter(d => !d.ganZhi.includes('童限'));
   if (libForward !== correctedForward) {
     const reversed = dayunList.slice().reverse().map(d => d.ganZhi);
     dayunList = dayunList.map((d, i) => ({ ...d, ganZhi: reversed[i] }));
