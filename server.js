@@ -80,7 +80,7 @@ async function getInterpretation(chart) {
       { role: 'user', content: buildUserMessage(chart) }
     ],
     temperature: 0.7,
-    max_tokens: 3500
+    max_tokens: 4095
   });
   return resp.choices[0].message.content;
 }
