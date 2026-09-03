@@ -26,6 +26,8 @@
   .row { display: flex; gap: 12px; }
   .row > div { flex: 1; }
   .opt { font-size: 12px; color: var(--sub); margin-top: 6px; }
+  .coord { display: inline-flex; gap: 8px; margin-top: 6px; vertical-align: middle; }
+  .coord-input { width: 120px; }
   button {
     margin-top: 16px; width: 100%; padding: 12px; border: 0; border-radius: 8px;
     background: var(--brand); color: #fff; font-size: 15px; cursor: pointer;
@@ -69,6 +71,9 @@
     .row > div + div { margin-top: 2px; }
     input, select { padding: 12px 10px; font-size: 16px; }  /* 16px 防止 iOS 聚焦时自动放大 + 更大点按区 */
     .opt { font-size: 12px; line-height: 1.8; }
+    /* 经纬度输入框：移动端占满整行、并排等分，去掉被 inline 样式卡住的 120px 固定宽 */
+    .coord { display: flex; width: 100%; margin-top: 8px; }
+    .coord-input { width: auto; flex: 1; }
     /* 命盘表格在窄屏横向滚动，避免撑破布局 */
     .report table.md-table { display: block; width: max-content; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; font-size: 12px; }
     .pillar .gz { font-size: 19px; }
@@ -107,7 +112,12 @@
     </div>
     <label>出生城市（用于真太阳时，可留空按北京）</label>
     <input id="city" type="text" placeholder="如 北京 / 上海 / 广州" />
-    <div class="opt">精确可选填经纬度：<input id="lng" type="text" placeholder="经度 如 116.40" style="display:inline-block;width:120px;margin-right:8px" /> <input id="lat" type="text" placeholder="纬度 如 39.90" style="display:inline-block;width:120px" /></div>
+    <div class="opt">精确可选填经纬度：
+      <span class="coord">
+        <input id="lng" type="text" class="coord-input" placeholder="经度 如 116.40" />
+        <input id="lat" type="text" class="coord-input" placeholder="纬度 如 39.90" />
+      </span>
+    </div>
     <button id="go" onclick="submitForm()">排盘并解读</button>
     <div id="err" class="err"></div>
   </div>
