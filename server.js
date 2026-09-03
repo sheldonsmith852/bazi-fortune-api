@@ -67,7 +67,7 @@ function buildUserMessage(chart) {
     `大运：起运${c.daYun.startAge}，${c.daYun.direction}（${c.daYun.directionNote}），起运约${c.daYun.startSolar}\n` +
     `当前大运序列（前3步）：${c.daYun.list.slice(0, 3).map(d => `${d.ganZhi}(${d.startAge}-${d.endAge}岁)`).join('，')}\n` +
     (c.currentLiuNian ? `当前流年：${c.currentLiuNian.ganZhi}（${c.currentLiuNian.year}年，约${c.currentLiuNian.age}岁，处${c.currentLiuNian.inDayun || '大运外'}）` : '当前流年：未计算');
-  return `以下是用户的八字命盘（已排好，请勿修改其中任何数字），请按你的系统指令撰写大白话解读报告：\n\n` +
+  return `以下是用户的八字命盘（已排好，请勿修改其中任何数字）。请严格依据你的系统提示词中【命理方法论参考资料】来撰写大白话解读报告，特别是取用神要走【参考资料·取用神】的法则、格局/十神/六亲/冲合均须引用对应篇章规则，不要凭通用知识发挥：\n\n` +
     `【命盘摘要】\n${summary}\n\n【原始命盘 JSON】\n${JSON.stringify(chart, null, 2)}`;
 }
 
@@ -80,7 +80,7 @@ async function getInterpretation(chart) {
       { role: 'user', content: buildUserMessage(chart) }
     ],
     temperature: 0.7,
-    max_tokens: 2000
+    max_tokens: 3500
   });
   return resp.choices[0].message.content;
 }
