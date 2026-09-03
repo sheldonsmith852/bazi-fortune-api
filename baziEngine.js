@@ -190,6 +190,41 @@ function buildStrength(dm, chart, hidden) {
   };
 }
 
+/** 用神（扶抑法）：日主过旺取"克、泄、耗"，过弱取"生、扶"，由引擎确定性算好喂给 LLM */
+function buildYongShen(dm, strength) {
+  const wA = GAN_INFO[dm][0];
+  const v = strength.verdict;
+  const keByW = Object.keys(WX_KE).find(k => WX_KE[k] === wA);            // 克我（官杀）
+  const keToW = WX_KE[wA];                                                // 我克（财星）
+  const shengToW = WX_SHENG[wA];                                          // 我生（食伤）
+  const shengByW = Object.keys(WX_SHENG).find(k => WX_SHENG[k] === wA);   // 生我（印）
+  let yong, xi, ji, reason;
+  if (v === '偏强') {
+    yong = [keByW, keToW, shengToW];
+    xi = [...yong];
+    ji = [shengByW, wA];
+    reason = `日主${dm}（${wA}）${v}（旺衰评分${strength.score}），过旺需以"克、泄、耗"损抑过旺之${wA}：克我者${keByW}（官杀）克${wA}、我克者${keToW}（财星）耗${wA}、我生者${shengToW}（食伤）泄${wA}；故用神取${yong.join('、')}。忌${shengByW}（生${wA}）、${wA}（比劫助身），二者会进一步加重身强。`;
+  } else if (v === '偏弱') {
+    yong = [shengByW, wA];
+    xi = [...yong];
+    ji = [keByW, keToW, shengToW];
+    reason = `日主${dm}（${wA}）${v}（旺衰评分${strength.score}），过弱需以"生、扶"补益虚弱之${wA}：生我者${shengByW}（印绶）生${wA}、同我者${wA}（比劫）助${wA}；故用神取${yong.join('、')}。忌${keByW}（克我）、${keToW}（耗我）、${shengToW}（泄我），三者会进一步削弱日主。`;
+  } else {
+    yong = [shengByW, wA, keByW];
+    xi = [...yong];
+    ji = [keToW, shengToW];
+    reason = `日主${dm}（${wA}）中和（旺衰评分${strength.score}），偏稳。扶抑法基准建议喜"生扶+约制"并行：${shengByW}（印）生${wA}、${wA}（比劫）助身、${keByW}（官杀）约制过散；忌${keToW}（重耗）、${shengToW}（重泄）。实际中和格用神需结合调候与格局，此为基准参考。`;
+  }
+  yong = [...new Set(yong)]; xi = [...new Set(xi)]; ji = [...new Set(ji)];
+  return {
+    method: '扶抑法（依据《四柱命理正源》取用神章）',
+    verdict: v,
+    yong, xi, ji,
+    reason,
+    note: '由引擎按扶抑法确定性推算；解读时直接引用 yong/xi/ji 与 reason，严禁自行改写五行生克方向（如不得将"金水泄耗日主"说成"金水生扶日主"，不得把忌神说成用神）。'
+  };
+}
+
 function pad(n) { return String(n).padStart(2, '0'); }
 
 // === 真太阳时 ===
@@ -325,9 +360,11 @@ function computeBazi(input) {
     }
   } catch (e) { currentLiuNian = null; }
 
-  // 7) 确定性衍生字段（五行个数 / 配偶星 / 日主旺衰）：由引擎算好，不让 LLM 自行推算
+  // 7) 确定性衍生字段（五行个数 / 配偶星 / 日主旺衰 / 用神）：由引擎算好，不让 LLM 自行推算
   const chartGZ = { year: yearGZ, month: monthGZ, day: dayGZ, time: timeGZ };
   const dmGan = ec.getDayGan();
+  const strength = buildStrength(dmGan, chartGZ, hidden);
+  const yongShen = buildYongShen(dmGan, strength);
 
   return {
     input: { date: opts.date, time: opts.time, gender: opts.gender, city: opts.city || null, lng, lat },
@@ -339,7 +376,8 @@ function computeBazi(input) {
     dayMaster: dmGan,
     wuXing: buildWuXing(chartGZ, hidden),
     spouseStar: buildSpouseStar(dmGan, gender, chartGZ, hidden),
-    strength: buildStrength(dmGan, chartGZ, hidden),
+    strength,
+    yongShen,
     chart: {
       year: yearGZ,
       month: monthGZ,
@@ -391,4 +429,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { computeBazi, shiShenOf, buildWuXing, buildSpouseStar, buildStrength, GAN_INFO, ZHI_WX };
+module.exports = { computeBazi, shiShenOf, buildWuXing, buildSpouseStar, buildStrength, buildYongShen, GAN_INFO, ZHI_WX };

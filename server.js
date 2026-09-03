@@ -66,6 +66,7 @@ function buildUserMessage(chart) {
     `★五行个数（引擎已算好，直接引用）：天干4+地支4 = ${JSON.stringify(c.wuXing.count)}；含藏干口径 = ${JSON.stringify(c.wuXing.countWithHidden)}\n` +
     `★配偶星（引擎已算好，直接引用，禁止自行另找星或改称）：${c.spouseStar.gender}｜${c.spouseStar.summary}\n` +
     `★日主旺衰（引擎已算好，直接引用，禁止自行另判）：结论=${c.strength.verdict}（评分${c.strength.score}）｜${c.strength.deLing.note}；${c.strength.deDi.note}；${c.strength.deShi.note}\n` +
+    `★用神（引擎扶抑法已算好，直接引用，禁止自行推算或改写五行生克方向）：用神=${c.yongShen.yong.join('、')}｜喜神=${c.yongShen.xi.join('、')}｜忌神=${c.yongShen.ji.join('、')}｜${c.yongShen.reason}\n` +
     `纳音：年[${c.naYin.year}] 月[${c.naYin.month}] 日[${c.naYin.day}] 时[${c.naYin.time}]\n` +
     `大运：起运${c.daYun.startAge}，${c.daYun.direction}（${c.daYun.directionNote}），起运约${c.daYun.startSolar}\n` +
     `当前大运序列（前3步）：${c.daYun.list.slice(0, 3).map(d => `${d.ganZhi}(${d.startAge}-${d.endAge}岁)`).join('，')}\n` +
