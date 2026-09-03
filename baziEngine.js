@@ -37,13 +37,17 @@ function pad(n) { return String(n).padStart(2, '0'); }
 // === 真太阳时 ===
 function trueSolarTime(year, month, day, hour, minute, lng) {
   const diffMin = Math.round((lng - 120) * 4);
-  let total = hour * 60 + minute + diffMin;
-  let y = year, mo = month, d = day;
-  while (total < 0) { total += 24 * 60; d -= 1; }
-  while (total >= 24 * 60) { total -= 24 * 60; d += 1; }
-  const h = Math.floor(total / 60);
-  const mi = Math.round(total % 60);
-  return { year: y, month: mo, day: d, hour: h, minute: mi, diffMin };
+  // 用 UTC 时间戳做日期算术：让 JS Date 自动处理跨日/跨月/跨年借位（不受时区与夏令时影响）
+  const baseMs = Date.UTC(year, month - 1, day, hour, minute, 0);
+  const t = new Date(baseMs + diffMin * 60000);
+  return {
+    year: t.getUTCFullYear(),
+    month: t.getUTCMonth() + 1,
+    day: t.getUTCDate(),
+    hour: t.getUTCHours(),
+    minute: t.getUTCMinutes(),
+    diffMin
+  };
 }
 
 function resolveLng(opts) {
