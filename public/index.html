@@ -147,6 +147,7 @@ function submitForm() {
     lng: document.getElementById('lng').value.trim() || undefined,
     lat: document.getElementById('lat').value.trim() || undefined
   };
+  saveForm();  // 查询条件立即缓存（不等解读成功），刷新必恢复
   if (!payload.date || !payload.time) { errEl.textContent = '请填好日期和时间'; return; }
   if (!payload.gender) { errEl.textContent = '请选择性别'; return; }
   btn.disabled = true; btn.textContent = '排盘中…';
@@ -160,7 +161,7 @@ function submitForm() {
     .then(r => r.json().then(j => ({ ok: r.ok, j })))
     .then(({ ok, j }) => {
       if (!ok) { errEl.textContent = j.error || '请求失败'; resEl.innerHTML = ''; return; }
-      saveCache(payload, j);
+      saveResult(j);
       render(j);
     })
     .catch(e => { errEl.textContent = '网络错误：' + e.message; resEl.innerHTML = ''; })
@@ -283,26 +284,55 @@ function renderMarkdown(md) {
   return html;
 }
 
-// === 本地缓存：解读结果存入 localStorage，刷新页面自动恢复；只有重新解读才覆盖 ===
-const CACHE_KEY = 'bazi_result_cache';
-function saveCache(payload, j) {
-  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ payload, j, ts: Date.now() })); } catch (e) {}
+// === 本地缓存 ===
+// 查询条件：输入即存（独立 key），刷新无条件恢复，不再依赖结果缓存是否存在
+// 解读结果：仅解读成功时写入，刷新命中才渲染，重新解读则覆盖
+const FORM_KEY = 'bazi_form_cache';
+const RES_KEY = 'bazi_result_cache';
+
+function readForm() {
+  return {
+    date: document.getElementById('date').value || '',
+    time: document.getElementById('time').value || '',
+    gender: document.getElementById('gender').value || '',
+    city: document.getElementById('city').value.trim(),
+    lng: document.getElementById('lng').value.trim(),
+    lat: document.getElementById('lat').value.trim()
+  };
 }
-function loadCache() {
-  try { return JSON.parse(localStorage.getItem(CACHE_KEY)); } catch (e) { return null; }
+function saveForm() {
+  try { localStorage.setItem(FORM_KEY, JSON.stringify(readForm())); } catch (e) {}
 }
-function fillForm(p) {
-  if (!p) return;
-  if (p.date) document.getElementById('date').value = p.date;
-  if (p.time) document.getElementById('time').value = p.time;
-  if (p.gender) document.getElementById('gender').value = p.gender;
-  if (p.city != null) document.getElementById('city').value = p.city;
-  if (p.lng != null) document.getElementById('lng').value = p.lng;
-  if (p.lat != null) document.getElementById('lat').value = p.lat;
+function loadForm() {
+  try { return JSON.parse(localStorage.getItem(FORM_KEY)); } catch (e) { return null; }
+}
+function fillForm(f) {
+  if (!f) return;
+  if (f.date) document.getElementById('date').value = f.date;
+  if (f.time) document.getElementById('time').value = f.time;
+  if (f.gender) document.getElementById('gender').value = f.gender;
+  // 文本类字段显式回填（含空串），完整还原上次输入状态
+  document.getElementById('city').value = f.city || '';
+  document.getElementById('lng').value = f.lng || '';
+  document.getElementById('lat').value = f.lat || '';
+}
+function saveResult(j) {
+  try { localStorage.setItem(RES_KEY, JSON.stringify({ j: j, ts: Date.now() })); } catch (e) {}
+}
+function loadResult() {
+  try { return JSON.parse(localStorage.getItem(RES_KEY)); } catch (e) { return null; }
 }
 window.addEventListener('DOMContentLoaded', function () {
-  const c = loadCache();
-  if (c && c.j && c.j.chart) { fillForm(c.payload); render(c.j, true); }
+  // 1) 查询条件：无条件恢复
+  fillForm(loadForm());
+  // 2) 输入即存，改了输入框但没点解读也能保住条件
+  ['date', 'time', 'gender', 'city', 'lng', 'lat'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) { el.addEventListener('change', saveForm); el.addEventListener('input', saveForm); }
+  });
+  // 3) 解读结果：命中缓存才渲染（重新解读会覆盖）
+  var c = loadResult();
+  if (c && c.j && c.j.chart) render(c.j, true);
 });
 </script>
 </body>
