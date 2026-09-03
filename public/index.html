@@ -71,9 +71,9 @@
     .row > div + div { margin-top: 2px; }
     input, select { padding: 12px 10px; font-size: 16px; }  /* 16px 防止 iOS 聚焦时自动放大 + 更大点按区 */
     .opt { font-size: 12px; line-height: 1.8; }
-    /* 经纬度输入框：移动端占满整行、并排等分，去掉被 inline 样式卡住的 120px 固定宽 */
-    .coord { display: flex; width: 100%; margin-top: 8px; }
-    .coord-input { width: auto; flex: 1; }
+    /* 经纬度输入框：移动端占满整行、各取 50% 并排；min-width:0 解除 input 默认最小宽，否则窄屏放不下会换行 */
+    .coord { display: flex; width: 100%; margin-top: 8px; gap: 8px; }
+    .coord-input { flex: 1 1 0; min-width: 0; width: auto; }
     /* 命盘表格在窄屏横向滚动，避免撑破布局 */
     .report table.md-table { display: block; width: max-content; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; font-size: 12px; }
     .pillar .gz { font-size: 19px; }
