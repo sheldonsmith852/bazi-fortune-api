@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>八字算命 · 在线排盘</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #ffffff; --ink: #1f2329; --sub: #6b7280;
+    --line: #e5e7eb; --brand: #b8322b; --brand2: #c8852b; --ok: #1a7f37;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg); color: var(--ink); line-height: 1.6;
+  }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 24px 16px 60px; }
+  h1 { font-size: 22px; margin: 8px 0 4px; }
+  .sub { color: var(--sub); font-size: 13px; margin-bottom: 20px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-bottom: 18px; }
+  label { display: block; font-size: 13px; color: var(--sub); margin: 10px 0 4px; }
+  input, select {
+    width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px;
+    font-size: 14px; background: #fff; color: var(--ink);
+  }
+  .row { display: flex; gap: 12px; }
+  .row > div { flex: 1; }
+  .opt { font-size: 12px; color: var(--sub); margin-top: 6px; }
+  button {
+    margin-top: 16px; width: 100%; padding: 12px; border: 0; border-radius: 8px;
+    background: var(--brand); color: #fff; font-size: 15px; cursor: pointer;
+  }
+  button:disabled { opacity: .6; cursor: not-allowed; }
+  .err { color: var(--brand); font-size: 13px; margin-top: 10px; }
+  .loading { color: var(--sub); font-size: 14px; padding: 10px 0; }
+  .pillars { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 8px 0 14px; }
+  .pillar { border: 1px solid var(--line); border-radius: 10px; padding: 12px 8px; text-align: center; }
+  .pillar .ttl { font-size: 12px; color: var(--sub); }
+  .pillar .gz { font-size: 22px; font-weight: 700; letter-spacing: 2px; }
+  .pillar .tg { font-size: 12px; color: var(--brand2); margin-top: 4px; }
+  .meta { font-size: 13px; color: var(--sub); }
+  .meta b { color: var(--ink); }
+  .report { white-space: pre-wrap; font-size: 14.5px; line-height: 1.85; }
+  .report h3, .report h1, .report h2 { font-size: 16px; margin: 14px 0 6px; }
+  .note { font-size: 12px; color: var(--sub); background: #faf6ef; border: 1px solid #f0e2c8; padding: 8px 10px; border-radius: 8px; margin-top: 10px; }
+  .disclaim { font-size: 12px; color: var(--sub); margin-top: 14px; border-top: 1px dashed var(--line); padding-top: 10px; }
+  code { background: #f0f1f3; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>八字算命 · 在线排盘</h1>
+  <div class="sub">输入出生信息，自动排盘并生成大白话解读。结果仅供娱乐与文化研究参考。</div>
+
+  <div class="card">
+    <div class="row">
+      <div>
+        <label>出生日期（公历）</label>
+        <input id="date" type="date" value="1999-06-15" />
+      </div>
+      <div>
+        <label>出生时间（24 小时）</label>
+        <input id="time" type="time" value="10:30" />
+      </div>
+      <div>
+        <label>性别</label>
+        <select id="gender">
+          <option value="male">男</option>
+          <option value="female">女</option>
+        </select>
+      </div>
+    </div>
+    <label>出生城市（用于真太阳时，可留空按北京）</label>
+    <input id="city" type="text" placeholder="如 黄石 / 上海 / 北京" value="黄石" />
+    <div class="opt">精确可选填经纬度：<input id="lng" type="text" placeholder="经度 如 115.05" style="display:inline-block;width:120px;margin-right:8px" /> <input id="lat" type="text" placeholder="纬度 如 30.20" style="display:inline-block;width:120px" /></div>
+    <button id="go" onclick="submitForm()">排盘并解读</button>
+    <div id="err" class="err"></div>
+  </div>
+
+  <div id="result"></div>
+</div>
+
+<script>
+function submitForm() {
+  const btn = document.getElementById('go');
+  const errEl = document.getElementById('err');
+  const resEl = document.getElementById('result');
+  errEl.textContent = '';
+  const payload = {
+    date: document.getElementById('date').value,
+    time: document.getElementById('time').value,
+    gender: document.getElementById('gender').value,
+    city: document.getElementById('city').value.trim() || undefined,
+    lng: document.getElementById('lng').value.trim() || undefined,
+    lat: document.getElementById('lat').value.trim() || undefined
+  };
+  if (!payload.date || !payload.time) { errEl.textContent = '请填好日期和时间'; return; }
+  btn.disabled = true; btn.textContent = '排盘中…';
+  resEl.innerHTML = '<div class="loading">正在排盘并请 AI 撰写解读，请稍候（约 3–8 秒）…</div>';
+
+  fetch('/api/bazi', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+    .then(r => r.json().then(j => ({ ok: r.ok, j })))
+    .then(({ ok, j }) => {
+      if (!ok) { errEl.textContent = j.error || '请求失败'; resEl.innerHTML = ''; return; }
+      render(j);
+    })
+    .catch(e => { errEl.textContent = '网络错误：' + e.message; resEl.innerHTML = ''; })
+    .finally(() => { btn.disabled = false; btn.textContent = '排盘并解读'; });
+}
+
+function render(j) {
+  const c = j.chart;
+  const pillars = [
+    ['年柱', c.chart.year, c.tenGods.year],
+    ['月柱', c.chart.month, c.tenGods.month],
+    ['日柱', c.chart.day, c.tenGods.day],
+    ['时柱', c.chart.time, c.tenGods.time]
+  ];
+  let html = '<div class="card"><div class="pillars">';
+  pillars.forEach(p => {
+    html += `<div class="pillar"><div class="ttl">${p[0]}</div><div class="gz">${p[1]}</div><div class="tg">${p[2]}</div></div>`;
+  });
+  html += '</div>';
+  html += `<div class="meta">日主（命主）：<b>${c.dayMaster}</b> ｜ 真太阳时：<b>${c.trueSolarTime.corrected}</b>（${c.trueSolarTime.note}）｜ 起运：<b>${c.daYun.startAge}</b>（${c.daYun.direction}）</div>`;
+  if (c.currentLiuNian) {
+    html += `<div class="meta">当前流年：<b>${c.currentLiuNian.ganZhi}</b>（${c.currentLiuNian.year} 年，约 ${c.currentLiuNian.age} 岁，处大运 ${c.currentLiuNian.inDayun || '外'}）</div>`;
+  }
+  html += '</div>';
+
+  if (j.interpretation) {
+    html += `<div class="card"><div class="report">${escapeHtml(j.interpretation)}</div>`;
+    if (j.llmNote) html += `<div class="note">⚠️ ${escapeHtml(j.llmNote)}</div>`;
+    html += '</div>';
+  } else {
+    html += `<div class="card"><div class="note">🔧 当前服务端未配置 LLM API Key，仅返回排盘结果。配置 <code>ZHIPU_API_KEY</code> 后将自动生成解读。<br>${j.llmNote ? escapeHtml(j.llmNote) : ''}</div></div>`;
+    // 仍展示原始 JSON 便于核对
+    html += `<div class="card"><div class="meta">原始命盘 JSON：</div><pre style="font-size:11px;overflow:auto;max-height:280px">${escapeHtml(JSON.stringify(c, null, 2))}</pre></div>`;
+  }
+  document.getElementById('result').innerHTML = html;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+}
+</script>
+</body>
+</html>

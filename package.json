@@ -1,0 +1,17 @@
+{
+  "name": "bazi-server",
+  "version": "1.0.0",
+  "description": "八字算命系统 · 服务器独立部署版（Hono + 纯算法排盘 + LLM 解读 + 网页展示）",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/baziEngine.test.js"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.1",
+    "dotenv": "^17.4.2",
+    "hono": "^4.13.5",
+    "lunar-javascript": "^1.3.18",
+    "openai": "^4.104.0"
+  }
+}
