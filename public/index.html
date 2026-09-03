@@ -56,6 +56,29 @@
   .note { font-size: 12px; color: var(--sub); background: #faf6ef; border: 1px solid #f0e2c8; padding: 8px 10px; border-radius: 8px; margin-top: 10px; }
   .disclaim { font-size: 12px; color: var(--sub); margin-top: 14px; border-top: 1px dashed var(--line); padding-top: 10px; }
   code { background: #f0f1f3; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+
+  /* === 移动端适配（≤600px） === */
+  @media (max-width: 600px) {
+    .wrap { padding: 14px 12px 44px; }
+    h1 { font-size: 19px; }
+    .sub { font-size: 12px; }
+    .card { padding: 14px; }
+    /* 出生信息三栏在窄屏改为竖向堆叠，避免输入框被压扁 */
+    .row { flex-direction: column; gap: 0; }
+    .row > div { width: 100%; }
+    .row > div + div { margin-top: 2px; }
+    input, select { padding: 12px 10px; font-size: 16px; }  /* 16px 防止 iOS 聚焦时自动放大 + 更大点按区 */
+    .opt { font-size: 12px; line-height: 1.8; }
+    /* 命盘表格在窄屏横向滚动，避免撑破布局 */
+    .report table.md-table { display: block; width: max-content; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; font-size: 12px; }
+    .pillar .gz { font-size: 19px; }
+    .pillars { gap: 8px; }
+    .meta { font-size: 12px; }
+    .report { font-size: 14px; line-height: 1.8; }
+  }
+  @media (max-width: 360px) {
+    .pillars { grid-template-columns: repeat(2, 1fr); }
+  }
 </style>
 </head>
 <body>
