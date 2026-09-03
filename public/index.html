@@ -113,8 +113,7 @@
       <div>
         <label>性别</label>
         <select id="gender">
-          <option value="" disabled selected>请选择</option>
-          <option value="male">男</option>
+          <option value="male" selected>男</option>
           <option value="female">女</option>
         </select>
       </div>
@@ -161,13 +160,14 @@ function submitForm() {
     .then(r => r.json().then(j => ({ ok: r.ok, j })))
     .then(({ ok, j }) => {
       if (!ok) { errEl.textContent = j.error || '请求失败'; resEl.innerHTML = ''; return; }
+      saveCache(payload, j);
       render(j);
     })
     .catch(e => { errEl.textContent = '网络错误：' + e.message; resEl.innerHTML = ''; })
     .finally(() => { btn.disabled = false; btn.textContent = '排盘并解读'; });
 }
 
-function render(j) {
+function render(j, fromCache) {
   const c = j.chart;
   const pillars = [
     ['年柱', c.chart.year, c.tenGods.year],
@@ -196,6 +196,7 @@ function render(j) {
     // 仍展示原始 JSON 便于核对
     html += `<div class="card"><div class="meta">原始命盘 JSON：</div><pre style="font-size:11px;overflow:auto;max-height:280px">${escapeHtml(JSON.stringify(c, null, 2))}</pre></div>`;
   }
+  if (fromCache) html += '<div class="note">📦 已加载上次解读的本地缓存结果。修改出生信息后点击「排盘并解读」即重新生成并覆盖缓存。</div>';
   document.getElementById('result').innerHTML = html;
 }
 
@@ -281,6 +282,28 @@ function renderMarkdown(md) {
   closeList(); closeQuote();
   return html;
 }
+
+// === 本地缓存：解读结果存入 localStorage，刷新页面自动恢复；只有重新解读才覆盖 ===
+const CACHE_KEY = 'bazi_result_cache';
+function saveCache(payload, j) {
+  try { localStorage.setItem(CACHE_KEY, JSON.stringify({ payload, j, ts: Date.now() })); } catch (e) {}
+}
+function loadCache() {
+  try { return JSON.parse(localStorage.getItem(CACHE_KEY)); } catch (e) { return null; }
+}
+function fillForm(p) {
+  if (!p) return;
+  if (p.date) document.getElementById('date').value = p.date;
+  if (p.time) document.getElementById('time').value = p.time;
+  if (p.gender) document.getElementById('gender').value = p.gender;
+  if (p.city != null) document.getElementById('city').value = p.city;
+  if (p.lng != null) document.getElementById('lng').value = p.lng;
+  if (p.lat != null) document.getElementById('lat').value = p.lat;
+}
+window.addEventListener('DOMContentLoaded', function () {
+  const c = loadCache();
+  if (c && c.j && c.j.chart) { fillForm(c.payload); render(c.j, true); }
+});
 </script>
 </body>
 </html>
