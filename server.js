@@ -19,6 +19,7 @@ const { cors } = require('hono/cors');
 
 const { computeBazi } = require('./baziEngine');
 const { SYSTEM_PROMPT } = require('./interpretation_prompt');
+const { registerPalm } = require('./palmRoute');
 
 const app = new Hono();
 const PORT = Number(process.env.PORT) || 3000;
@@ -137,6 +138,9 @@ app.post('/api/bazi', async (c) => {
 
   return c.json({ chart, interpretation, llmNote });
 });
+
+// 手掌分析接口（子进程调 Python 引擎，详见 palmRoute.js）
+registerPalm(app, rateLimited);
 
 // === 静态页（前端完全内联，这里直接读 index.html） ===
 app.get('/', (c) => {
