@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>手相分析 · 上传手掌照片</title>
+<style>
+  :root {
+    --bg:#f5f6f8; --card:#fff; --ink:#1f2329; --sub:#6b7280;
+    --line:#e5e7eb; --brand:#b8322b; --brand2:#c8852b; --ok:#1a7f37;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+         background:var(--bg); color:var(--ink); line-height:1.6; }
+  .wrap { max-width:900px; margin:0 auto; padding:24px 16px 60px; }
+  h1 { font-size:22px; margin:8px 0 4px; }
+  h2 { font-size:16px; margin:0 0 10px; border-left:4px solid var(--brand); padding-left:10px; }
+  .sub { color:var(--sub); font-size:13px; margin-bottom:20px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px; margin-bottom:18px; }
+  a.back { color:var(--brand); font-size:13px; text-decoration:none; }
+  input[type=file] { width:100%; padding:10px; border:1px dashed var(--line); border-radius:8px;
+                     font-size:14px; background:#fafbfc; }
+  button { margin-top:14px; width:100%; padding:12px; border:0; border-radius:8px;
+           background:var(--brand); color:#fff; font-size:15px; cursor:pointer; }
+  button:disabled { opacity:.6; cursor:not-allowed; }
+  button.ghost { background:#fff; color:var(--brand); border:1px solid var(--line); }
+  .err { color:var(--brand); font-size:13px; margin-top:10px; }
+  .loading { color:var(--sub); font-size:14px; padding:10px 0; }
+  .hidden { display:none; }
+  .preview { max-width:100%; max-height:260px; border-radius:8px; border:1px solid var(--line); margin-top:12px; }
+  .imgs { display:flex; gap:12px; flex-wrap:wrap; }
+  .imgs figure { flex:1; min-width:240px; margin:0; }
+  .imgs img { width:100%; border-radius:10px; border:1px solid var(--line); display:block; }
+  figcaption { font-size:12px; color:var(--sub); margin-top:6px; text-align:center; }
+  @media (max-width:640px){ .imgs { flex-direction:column; } }
+  table { width:100%; border-collapse:collapse; font-size:13.5px; margin-top:6px; }
+  th,td { border:1px solid var(--line); padding:7px 9px; text-align:left; vertical-align:top; }
+  th { background:#f3f4f6; font-weight:600; color:var(--ink); }
+  .kv { width:150px; color:var(--sub); }
+  .pillars { display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:10px; margin:8px 0 14px; }
+  .pillar { border:1px solid var(--line); border-radius:10px; padding:10px 8px; text-align:center; }
+  .pillar .ttl { font-size:12px; color:var(--ink); font-weight:600; }
+  .pillar .gz { font-size:20px; font-weight:700; color:var(--brand2); }
+  .pillar .tg { font-size:11px; color:var(--sub); margin-top:2px; }
+  .meta { font-size:13px; color:var(--sub); }
+  .note { font-size:12px; color:var(--sub); background:#faf6ef; border:1px solid #f0e2c8;
+          padding:8px 10px; border-radius:8px; margin-top:10px; }
+  .disclaim { font-size:12px; color:var(--sub); margin-top:14px; border-top:1px dashed var(--line); padding-top:10px; }
+  .legend { font-size:12px; color:var(--sub); margin-top:10px; line-height:1.9; }
+  .legend span { display:inline-block; margin-right:14px; }
+  details { margin-top:10px; }
+  summary { cursor:pointer; font-size:13px; color:var(--sub); }
+  pre { background:#f6f7f9; padding:10px; border-radius:8px; overflow:auto; font-size:11.5px; max-height:340px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/">← 回到八字排盘</a>
+  <h1>手相分析</h1>
+  <div class="sub">上传一张手掌照片，服务端自动提取掌纹并生成金色标注图。约需 5–10 秒。<br>
+    <b>照片仅用于本次分析，服务器处理完立即删除，不做任何留存。</b></div>
+
+  <div class="card">
+    <h2>① 选择照片</h2>
+    <input id="file" type="file" accept="image/*" />
+    <img id="preview" class="preview hidden" alt="预览" />
+    <button id="go">开始分析</button>
+    <button id="again" class="ghost hidden">重新选一张</button>
+    <div id="loading" class="loading hidden"></div>
+    <div id="err" class="err"></div>
+    <div class="note">拍摄建议：自然光下、掌心完全展开、正对镜头、画面清晰不抖。光线越均匀，纹路读得越准。</div>
+  </div>
+
+  <div id="result" class="hidden">
+    <div class="card">
+      <h2>② 原图 / 金色标注图</h2>
+      <div class="imgs">
+        <figure><img id="imgOrig" alt="原图"><figcaption>原图</figcaption></figure>
+        <figure><img id="imgAnno" alt="金色标注图"><figcaption>金色标注图</figcaption></figure>
+      </div>
+      <div class="legend">
+        <span>🟡 金色 = 掌纹皱褶</span>
+        <span>🔴 红框 = 断口 / 岛纹</span>
+        <span>🟣 品红 = 川字掌关系</span>
+        <span>🟡 黄 = 双太阳线</span>
+        <span>🩵 青 = 羽毛纹</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>③ 概览</h2>
+      <table id="tOverview"></table>
+    </div>
+
+    <div class="card">
+      <h2>④ 主线</h2>
+      <table id="tLines"></table>
+    </div>
+
+    <div class="card">
+      <h2>⑤ 进阶纹向</h2>
+      <table id="tExtra"></table>
+    </div>
+
+    <div class="card">
+      <h2>⑥ 掌中吉纹</h2>
+      <div class="pillars" id="pWealth"></div>
+      <details><summary>展开完整列表</summary><table id="tWealth"></table></details>
+    </div>
+
+    <div class="card">
+      <h2>⑦ 原始数据</h2>
+      <details><summary>展开 palm.json</summary><pre id="raw"></pre></details>
+      <div class="disclaim">手相属民俗文化，仅供娱乐参照。照片自动识别，个别纹路若拍得偏淡可能略有出入；财富与健康请以专业意见为准。</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const fileInput = $('file'), preview = $('preview'), goBtn = $('go'), againBtn = $('again');
+const loadingEl = $('loading'), errEl = $('err'), resultEl = $('result');
+let timer = null, t0 = 0;
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, m =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+fileInput.addEventListener('change', () => {
+  const f = fileInput.files[0];
+  errEl.textContent = '';
+  if (!f) { preview.classList.add('hidden'); return; }
+  preview.src = URL.createObjectURL(f);
+  preview.classList.remove('hidden');
+});
+
+againBtn.addEventListener('click', () => {
+  fileInput.value = '';
+  preview.classList.add('hidden');
+  resultEl.classList.add('hidden');
+  againBtn.classList.add('hidden');
+  errEl.textContent = '';
+});
+
+// 超大图（长边 > 2400px）客户端降采样，避免手机上传过慢；失败则回退原图
+async function prepareFile(file) {
+  const MAX = 2400;
+  try {
+    const bmp = await createImageBitmap(file);
+    const long = Math.max(bmp.width, bmp.height);
+    if (long <= MAX) return file;
+    const s = MAX / long;
+    const c = document.createElement('canvas');
+    c.width = Math.round(bmp.width * s);
+    c.height = Math.round(bmp.height * s);
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.92));
+    if (!blob) return file;
+    return new File([blob], file.name.replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' });
+  } catch (e) { return file; }
+}
+
+function startLoading() {
+  t0 = Date.now();
+  loadingEl.classList.remove('hidden');
+  loadingEl.textContent = '正在分析… 已用时 0s';
+  timer = setInterval(() => {
+    loadingEl.textContent = '正在分析… 已用时 ' + Math.round((Date.now() - t0) / 1000) + 's';
+  }, 500);
+}
+function stopLoading() {
+  clearInterval(timer);
+  loadingEl.classList.add('hidden');
+}
+
+goBtn.addEventListener('click', async () => {
+  const f = fileInput.files[0];
+  if (!f) { errEl.textContent = '请先选择一张手掌照片。'; return; }
+  errEl.textContent = '';
+  goBtn.disabled = true;
+  startLoading();
+  try {
+    const up = await prepareFile(f);
+    const fd = new FormData();
+    fd.append('image', up);
+    const res = await fetch('/api/palm', { method: 'POST', body: fd });
+    let data = null;
+    try { data = await res.json(); } catch (e) {}
+    if (!res.ok || (data && data.error)) {
+      throw new Error((data && data.error) || ('请求失败（HTTP ' + res.status + '）'));
+    }
+    render(data, Math.round((Date.now() - t0) / 1000));
+  } catch (e) {
+    errEl.textContent = '分析失败：' + e.message;
+  } finally {
+    stopLoading();
+    goBtn.disabled = false;
+  }
+});
+
+function render(data, secs) {
+  const r = data.report || {};
+  const hand = r.hand || {}, qs = r.qualityScore || {};
+  const ef = r.extraFeatures || {}, cs = r.careerSpine || {};
+
+  $('imgOrig').src = data.originalImage || '';
+  $('imgAnno').src = data.annotatedImage || '';
+
+  const conf = ef.chuan || {}, sun = ef.sunDouble || {}, fea = ef.heartFeather || {};
+  const chuanTxt = conf.isChuan ? '<b style="color:var(--ok)">是</b>'
+    : '非典型（智慧线↔感情线 ' + (conf.mindHeartSeparate ? '分离' : '相连') +
+      '，生命线↔智慧线 ' + (conf.lifeMindSeparate ? '分离' : '相连') + '）';
+
+  $('tOverview').innerHTML =
+    '<tr><td class="kv">手掌</td><td>' + esc(hand.label === 'Left' ? '左手' : (hand.label === 'Right' ? '右手' : hand.label)) +
+      '（置信 ' + esc(hand.confidence) + '%）</td></tr>' +
+    '<tr><td class="kv">照片质量分</td><td><b>' + esc(qs.score) + '</b>（' + esc(qs.label) + '）— ' + esc(qs.note) + '</td></tr>' +
+    '<tr><td class="kv">感情线末端走向</td><td>' + esc(r.heartEndTrend) + '</td></tr>' +
+    '<tr><td class="kv">事业线（纵脊）</td><td>' + esc(cs.label) + (cs.visible ? '（覆盖 ' + esc(cs.coverage) + '）' : '') + '</td></tr>' +
+    '<tr><td class="kv">服务端耗时</td><td>约 ' + secs + ' 秒</td></tr>';
+
+  let lh = '<tr><th>线</th><th>清晰度</th><th>相对长度</th><th>标记</th><th>置信</th></tr>';
+  (r.lines || []).forEach(l => {
+    lh += '<tr><td>' + esc(l.name) + '</td><td>' + esc(l.clarity) + '</td><td>' +
+      esc(typeof l.length === 'number' ? l.length.toFixed(3) : l.length) + '</td><td>' +
+      (l.mark && l.mark !== 'none' ? esc(l.mark) : '—') + '</td><td>' + esc(l.confidence) + '</td></tr>';
+  });
+  $('tLines').innerHTML = lh;
+
+  $('tExtra').innerHTML =
+    '<tr><td class="kv">川字掌</td><td>' + chuanTxt + '　置信 ' + esc(conf.confidence) +
+      '（智慧线↔感情线间距 ' + esc(conf.mindHeartGap) + '）</td></tr>' +
+    '<tr><td class="kv">双太阳线</td><td>' + (sun.isDouble ? '<b style="color:var(--ok)">有</b>' : '无') +
+      '，检出主脊 ' + esc(sun.count) + ' 条　置信 ' + esc(sun.confidence) + '</td></tr>' +
+    '<tr><td class="kv">感情线羽毛纹</td><td>' + (fea.has ? '<b style="color:var(--ok)">有</b>，分叉 ' + esc(fea.forks) + ' 处' : '无') +
+      '　置信 ' + esc(fea.confidence) + '</td></tr>';
+
+  const marks = r.wealthMarks || [];
+  const byType = {};
+  marks.forEach(m => { const t = m.type || '未分类'; (byType[t] = byType[t] || []).push(m); });
+  $('pWealth').innerHTML = Object.keys(byType).length
+    ? Object.keys(byType).map(t =>
+        '<div class="pillar"><div class="ttl">' + esc(t) + '</div><div class="gz">' +
+        byType[t].length + '</div><div class="tg">处</div></div>').join('')
+    : '<div class="meta">未检测到明显掌中吉纹。</div>';
+
+  let wh = '<tr><th>类型</th><th>位置</th><th>置信</th><th>说明</th></tr>';
+  marks.forEach(m => {
+    wh += '<tr><td>' + esc(m.type) + '</td><td>' + esc(m.location) + '</td><td>' +
+      esc(m.confidence) + '</td><td>' + esc(m.detail) + '</td></tr>';
+  });
+  $('tWealth').innerHTML = wh;
+
+  $('raw').textContent = JSON.stringify(r, null, 2);
+
+  resultEl.classList.remove('hidden');
+  againBtn.classList.remove('hidden');
+  resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+</script>
+</body>
+</html>

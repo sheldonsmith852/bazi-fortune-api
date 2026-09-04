@@ -76,6 +76,15 @@ function registerPalm(app, rateLimited) {
       } catch (_) {}
     }
   });
+  // 手掌上传页（手机友好）
+  app.get('/palm', (c) => {
+    try {
+      const html = fs.readFileSync(path.join(__dirname, 'public', 'palm.html'), 'utf8');
+      return c.html(html);
+    } catch (e) {
+      return c.text('palm.html 未找到', 500);
+    }
+  });
 }
 
 module.exports = { registerPalm };
