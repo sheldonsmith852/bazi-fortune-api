@@ -77,7 +77,7 @@ async function getPalmInterpretation(llmClient, model, report) {
       { role: 'system', content: PALM_SYSTEM_PROMPT },
       { role: 'user', content: buildPalmUserMessage(report) }
     ],
-    temperature: 0.75,
+    temperature: 0.6,
     max_tokens: 2048
   });
   return resp.choices[0].message.content;
