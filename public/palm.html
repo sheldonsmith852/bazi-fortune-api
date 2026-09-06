@@ -108,6 +108,7 @@
     <div class="card">
       <h2>⑤ 主线</h2>
       <table id="tLines"></table>
+      <p style="font-size:12px;color:#9aa0a6;margin:6px 2px 0">年龄带：生命线 = 引擎实测 0-78 岁流年带；智慧线/感情线/事业线/太阳线 = 相书流年参照的约数（非实测），只作叙述参考。</p>
     </div>
 
     <div class="card">
@@ -262,6 +263,15 @@ function render(data, secs) {
     '<tr><td class="kv">服务端耗时</td><td>约 ' + secs + ' 秒</td></tr>';
 
   const MARKCN = { chain: '锁链纹', island: '岛纹', break: '断口' };
+  const stCN = { good: '纹实', mid: '中等', low: '偏淡' };
+  // 生命线实测 0-78 岁流年带（按年龄升序）
+  const lt2 = r.lifeTimeline || {};
+  const lifeBands = (lt2.segments || [])
+    .map(s => { const m = String(s.age || '').split('-').map(x => parseInt(x, 10)); return { lo: m[0] || 0, hi: m[1] != null ? m[1] : m[0] || 0, state: s.state }; })
+    .sort((a, b) => a.lo - b.lo);
+  const lifeBandTxt = lifeBands.length
+    ? lifeBands.map(s => s.lo + '-' + s.hi + '岁' + (stCN[s.state] || s.state)).join(' → ')
+    : '';
   let lh = '<tr><th>线</th><th>清晰度</th><th>相对长度</th><th>起止深浅</th><th>分段清晰度</th><th>形态</th><th>标记</th><th>置信</th></tr>';
   (r.lines || []).forEach(l => {
     const dg = l.depthGradient || {};
@@ -274,6 +284,17 @@ function render(data, secs) {
     const markCell = marks.length ? marks.map(m => esc(MARKCN[m.type] || m.type)).join('、') : (l.mark && l.mark !== 'none' ? esc(l.mark) : '—');
     lh += '<tr><td>' + esc(l.name) + '</td><td>' + esc(l.clarity) + '</td><td>' +
       esc(typeof l.length === 'number' ? l.length.toFixed(3) : l.length) + '</td><td>' + dgCell + '</td><td>' + segCell + '</td><td>' + shapeCell + '</td><td>' + markCell + '</td><td>' + esc(l.confidence) + '</td></tr>';
+    // 年龄带子行：生命线用实测流年带；其余线用服务器注好的相书流年参照年龄
+    let bandTxt = '';
+    if (l.name === '生命线') {
+      bandTxt = lifeBandTxt ? '实测流年带：' + lifeBandTxt : '';
+    } else {
+      bandTxt = segs.length ? segs.map(s => (s.age ? '约' + s.age + '岁' + s.st : s.rel.replace('段', '') + s.st)).join('→') : '';
+      if (bandTxt) bandTxt = '相书流年参照：' + bandTxt;
+    }
+    if (bandTxt) {
+      lh += '<tr class="bandrow"><td class="kv">年龄带</td><td colspan="7" style="font-size:12px;color:#7c8188;line-height:1.6">' + esc(bandTxt) + '</td></tr>';
+    }
   });
   $('tLines').innerHTML = lh;
 

@@ -10,7 +10,7 @@ const fs = require('fs');
 const path = require('path');
 
 const { computeBazi } = require('./baziEngine');
-const { runPalmEngine } = require('./palmRoute');
+const { runPalmEngine, buildPalmSummary: buildPalmSummaryRich } = require('./palmRoute');
 const { SYSTEM_PROMPT: CONSULT_SYSTEM_PROMPT } = require('./consult_interpretation_prompt');
 
 // === 把结构化数据拼成给 LLM 的 user 消息（双份摘要 + 原始 JSON） ===
@@ -30,36 +30,12 @@ function buildBaziSummary(c) {
   );
 }
 
-function buildPalmSummary(r) {
-  const hand = r.hand || {};
-  const qs = r.qualityScore || {};
-  const lines = r.lines || [];
-  const lineTxt = lines.map(l =>
-    `- ${l.name}：清晰度=${l.clarity}，相对长度=${typeof l.length === 'number' ? l.length.toFixed(3) : l.length}，标记=${l.mark && l.mark !== 'none' ? l.mark : '无'}`
-  ).join('\n');
-  const ef = r.extraFeatures || {};
-  const chuan = ef.chuan || {};
-  const extraTxt =
-    `- 川字掌：${chuan.isChuan ? '是' : '非典型'}（智慧线↔感情线间距 ${chuan.mindHeartGap}）\n` +
-    `- 双太阳线：${(ef.sunDouble || {}).isDouble ? '有' : '无'}\n` +
-    `- 感情线羽毛纹：${(ef.heartFeather || {}).has ? '有' : '无'}`;
-  const marks = r.wealthMarks || [];
-  const markTxt = marks.length ? `${marks.length} 处（${marks.map(m => m.type || '未分类').join('、')}）` : '未检出';
-  return (
-    `手掌：${hand.label === 'Left' ? '左手' : (hand.label === 'Right' ? '右手' : hand.label || '未知')}（识别置信 ${hand.confidence}%）\n` +
-    `照片质量分：${qs.score}（${qs.label}）\n` +
-    (r.heartEndTrend ? `感情线末端走向：${r.heartEndTrend}\n` : '') +
-    (r.careerSpine ? `事业线（纵脊）：${r.careerSpine.label}\n` : '') +
-    `\n【主线】\n${lineTxt}\n\n【进阶纹向】\n${extraTxt}\n\n【掌中吉纹】${markTxt}`
-  );
-}
-
 function buildConsultUserMessage(chart, report) {
   return (
     `以下是求问者的【八字命盘】与【手掌结构化分析】两份数据（均由确定性算法提取 / 排好，请勿修改其中任何数字）。\n` +
     `请严格依据你的系统提示词，对八字与手相做一份「合参」解读：把两套信息相互印证、也温和指出张力，合成一篇有温度的讲述。\n\n` +
     `【八字命盘摘要】\n${buildBaziSummary(chart)}\n\n【八字原始 JSON】\n${JSON.stringify(chart, null, 2)}\n\n` +
-    `【手掌分析摘要】\n${buildPalmSummary(report)}\n\n【手掌原始 JSON】\n${JSON.stringify(report, null, 2)}`
+    `【手掌分析摘要】\n${buildPalmSummaryRich(report)}\n\n【手掌原始 JSON】\n${JSON.stringify(report, null, 2)}`
   );
 }
 

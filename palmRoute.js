@@ -48,9 +48,10 @@ const MAX_CONCURRENT = 2;
 let active = 0;
 
 /**
- * 把结构化掌纹数据组装成给 LLM 的 user 消息（自然语言摘要 + 原始 JSON）
+ * 生成手掌数据自然语言摘要（含生命线实测流年带、各线分段/形态/相书流年参照约岁数、吉纹分级）。
+ * 供手掌解读 user 消息与合参（consultRoute）复用。
  */
-function buildPalmUserMessage(report) {
+function buildPalmSummary(report) {
   const hand = report.hand || {};
   const qs = report.qualityScore || {};
   const lines = report.lines || [];
@@ -135,9 +136,44 @@ function buildPalmUserMessage(report) {
     `【掌中吉纹（高置信，传统视为吉兆，可轻描"主聚财/利积蓄"）】${hiTxt}\n` +
     `【低置信纹理（多属拓扑节点噪声，切勿视为吉纹或据此断运势，只可说"纹理交汇较密"）】${loTxt}`;
 
+  return summary;
+}
+
+/**
+ * 把结构化掌纹数据组装成给 LLM 的 user 消息（自然语言摘要 + 原始 JSON）
+ */
+function buildPalmUserMessage(report) {
   return `以下是求问者手掌的结构化分析数据（由确定性算法提取，请勿修改其中任何数值）。\n` +
     `请严格依据系统提示词中的【手相权威知识库】撰写解读，只可用其中的传统说法，不得超纲编造。\n\n` +
-    `【数据摘要】\n${summary}\n\n【原始数据 JSON】\n${JSON.stringify(report, null, 2)}`;
+    `【数据摘要】\n${buildPalmSummary(report)}\n\n【原始数据 JSON】\n${JSON.stringify(report, null, 2)}`;
+}
+
+/**
+ * 服务器端给返回数据注年龄（前端无需重复维护参照表）：
+ * 非生命线 segments 每段补 age 区间、marks 补约 age；生命线已由 lifeTimeline 提供实测年龄。
+ * 对 /api/palm 与 /api/consult 都生效（runPalmEngine 统一调用）。
+ */
+function annotateFlowAges(report) {
+  const lines = report && report.lines;
+  if (!Array.isArray(lines)) return report;
+  lines.forEach(l => {
+    const key = NAME_KEY[l.name];
+    const flow = key && key !== 'life' ? FLOW_YEARS[key] : null;
+    if (!flow) return;
+    const segs = l.segments;
+    if (Array.isArray(segs) && segs.length) {
+      segs.forEach((s, i) => {
+        if (s && s.age == null) {
+          s.age = `${flowAge(key, i / segs.length)}-${flowAge(key, (i + 1) / segs.length)}`;
+        }
+      });
+    }
+    const ms = l.marks;
+    if (Array.isArray(ms)) {
+      ms.forEach(m => { if (m && m.age == null && typeof m.pos === 'number') m.age = flowAge(key, m.pos); });
+    }
+  });
+  return report;
 }
 
 async function getPalmInterpretation(llmClient, model, report) {
@@ -190,7 +226,7 @@ async function runPalmEngine(buf) {
     if (!fs.existsSync(jsonPath)) {
       throw new Error('引擎未产出 palm.json，可能照片无法识别手掌或图片过暗');
     }
-    const report = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+    const report = annotateFlowAges(JSON.parse(fs.readFileSync(jsonPath, 'utf8')));
 
     let annotatedImage = null;
     if (fs.existsSync(pngPath)) {
@@ -265,4 +301,4 @@ function registerPalm(app, rateLimited, llmClient, model) {
   });
 }
 
-module.exports = { registerPalm, runPalmEngine };
+module.exports = { registerPalm, runPalmEngine, buildPalmSummary, buildPalmUserMessage };
