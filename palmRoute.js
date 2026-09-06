@@ -17,6 +17,9 @@ const { SYSTEM_PROMPT: PALM_SYSTEM_PROMPT } = require('./palm_interpretation_pro
 const PYTHON = '/opt/palm-venv/bin/python';
 const ENGINE = '/opt/palm-engine/palm_read.py';
 
+// 与引擎 palm_read.py 的 MARKCN 保持一致
+const MARKCN = { chain: '锁链纹', island: '岛纹', break: '断口' };
+
 // 并发保护：2C4G 还与 bazi、薅羊毛日报共用，限制同时进行的手掌分析数
 const MAX_CONCURRENT = 2;
 let active = 0;
@@ -35,8 +38,20 @@ function buildPalmUserMessage(report) {
     const dgTxt = dg.type ? `，起止深浅=${dg.type}（${dg.desc || ''}）` : '';
     const clrNote = l.clarity === '清晰' ? '' :
       `（讲述此线时须如实用「${l.clarity}清晰」表述，严禁拔高成"清晰"）`;
+    const segs = l.segments || [];
+    const segTxt = segs.length
+      ? `，分段清晰度=[${segs.map(s => s.rel + s.st).join('→')}]`
+      : '';
+    const sh = l.shape || {};
+    const shapeTxt = sh.note
+      ? `，形态=${sh.note}${typeof sh.turningPoints === 'number' ? `（${sh.turningPoints}处弯折）` : ''}`
+      : '';
+    const ms = l.marks || [];
+    const markTxt = ms.length
+      ? `，标记=${ms.map(m => (MARKCN[m.type] || m.type) + (m.label ? `(${m.label})` : '')).join('、')}`
+      : '，标记=无';
     return `- ${l.name}：清晰度=${l.clarity}，相对长度=${typeof l.length === 'number' ? l.length.toFixed(3) : l.length}` +
-      `，标记=${l.mark && l.mark !== 'none' ? l.mark : '无'}${dgTxt}${clrNote}`;
+      `${markTxt}${dgTxt}${segTxt}${shapeTxt}${clrNote}`;
   }).join('\n');
 
   const chuan = ef.chuan || {};

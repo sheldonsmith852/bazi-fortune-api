@@ -261,13 +261,19 @@ function render(data, secs) {
     '<tr><td class="kv">生命线流年</td><td>' + ltTxt + '</td></tr>' +
     '<tr><td class="kv">服务端耗时</td><td>约 ' + secs + ' 秒</td></tr>';
 
-  let lh = '<tr><th>线</th><th>清晰度</th><th>相对长度</th><th>起止深浅</th><th>标记</th><th>置信</th></tr>';
+  const MARKCN = { chain: '锁链纹', island: '岛纹', break: '断口' };
+  let lh = '<tr><th>线</th><th>清晰度</th><th>相对长度</th><th>起止深浅</th><th>分段清晰度</th><th>形态</th><th>标记</th><th>置信</th></tr>';
   (r.lines || []).forEach(l => {
     const dg = l.depthGradient || {};
     const dgCell = dg.type ? esc(dg.type) + (dg.desc ? '（' + esc(String(dg.desc).slice(0, 10)) + '…）' : '') : '—';
+    const segs = l.segments || [];
+    const segCell = segs.length ? segs.map(s => s.rel.replace('段', '') + s.st).join('→') : '—';
+    const sh = l.shape || {};
+    const shapeCell = sh.note ? esc(sh.note) + (typeof sh.turningPoints === 'number' ? '（' + sh.turningPoints + '弯折）' : '') : '—';
+    const marks = l.marks || [];
+    const markCell = marks.length ? marks.map(m => esc(MARKCN[m.type] || m.type)).join('、') : (l.mark && l.mark !== 'none' ? esc(l.mark) : '—');
     lh += '<tr><td>' + esc(l.name) + '</td><td>' + esc(l.clarity) + '</td><td>' +
-      esc(typeof l.length === 'number' ? l.length.toFixed(3) : l.length) + '</td><td>' + dgCell + '</td><td>' +
-      (l.mark && l.mark !== 'none' ? esc(l.mark) : '—') + '</td><td>' + esc(l.confidence) + '</td></tr>';
+      esc(typeof l.length === 'number' ? l.length.toFixed(3) : l.length) + '</td><td>' + dgCell + '</td><td>' + segCell + '</td><td>' + shapeCell + '</td><td>' + markCell + '</td><td>' + esc(l.confidence) + '</td></tr>';
   });
   $('tLines').innerHTML = lh;
 
