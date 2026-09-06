@@ -20,6 +20,29 @@ const ENGINE = '/opt/palm-engine/palm_read.py';
 // 与引擎 palm_read.py 的 MARKCN 保持一致
 const MARKCN = { chain: '锁链纹', island: '岛纹', break: '断口' };
 
+// 中文线名 → key
+const NAME_KEY = { '生命线': 'life', '智慧线': 'mind', '感情线': 'heart', '事业线': 'fate', '太阳线': 'sun' };
+
+// 相书流年参照（各流派取中值的约定，非实测）：把非生命线按传统摊成一段人生年龄段，
+// 供解读把线特征/标记落成"约XX岁前后"。起点=小岁数端，末端=大岁数端。仅生命线用引擎实测 0-78 岁轴。
+const FLOW_YEARS = {
+  mind:  { from: 8,  to: 50, span: '约8-50岁：拇指侧≈求学少年、末端小指侧≈50岁上下' },
+  heart: { from: 18, to: 65, span: '约18-65岁：小指侧起点≈情窦初开、末端拇指侧≈中晚年' },
+  fate:  { from: 25, to: 60, span: '约25-60岁：腕端≈而立前后起步、越向指端越晚近' },
+  sun:   { from: 30, to: 65, span: '约30-65岁：成名/成果多偏中年以后' },
+};
+
+// 把 0-1 相对位置换算成该线（相书参照）的约年龄
+function flowAge(key, frac) {
+  const f = FLOW_YEARS[key];
+  if (!f) return null;
+  const c = Math.max(0, Math.min(1, Number(frac) || 0));
+  return Math.round(f.from + c * (f.to - f.from));
+}
+
+// 生命线流年带状态的中文档位
+const BANDCN = { good: '纹实', mid: '中等', low: '偏淡' };
+
 // 并发保护：2C4G 还与 bazi、薅羊毛日报共用，限制同时进行的手掌分析数
 const MAX_CONCURRENT = 2;
 let active = 0;
@@ -34,13 +57,22 @@ function buildPalmUserMessage(report) {
   const ef = report.extraFeatures || {};
 
   const lineTxt = lines.map(l => {
+    const key = NAME_KEY[l.name];
     const dg = l.depthGradient || {};
     const dgTxt = dg.type ? `，起止深浅=${dg.type}（${dg.desc || ''}）` : '';
     const clrNote = l.clarity === '清晰' ? '' :
       `（讲述此线时须如实用「${l.clarity}清晰」表述，严禁拔高成"清晰"）`;
     const segs = l.segments || [];
+    const flow = key && key !== 'life' ? FLOW_YEARS[key] : null;
     const segTxt = segs.length
       ? `，分段清晰度=[${segs.map(s => s.rel + s.st).join('→')}]`
+      : '';
+    // 非生命线：把 6 段按相书流年参照摊成年龄带（约数），供解读落"XX岁前后"
+    const flowTxt = (flow && segs.length)
+      ? `，流年参照（相书约定·非实测：${flow.span}）按段摊开=[${segs.map((s, i) => {
+          const a0 = flowAge(key, i / segs.length), a1 = flowAge(key, (i + 1) / segs.length);
+          return `${a0}-${a1}岁${s.st}`;
+        }).join('→')}]`
       : '';
     const sh = l.shape || {};
     const shapeTxt = sh.note
@@ -48,10 +80,14 @@ function buildPalmUserMessage(report) {
       : '';
     const ms = l.marks || [];
     const markTxt = ms.length
-      ? `，标记=${ms.map(m => (MARKCN[m.type] || m.type) + (m.label ? `(${m.label})` : '')).join('、')}`
+      ? `，标记=${ms.map(m => {
+          const mkLoc = m.label || '';
+          const mkAge = (flow && typeof m.pos === 'number') ? `·约${flowAge(key, m.pos)}岁（参照）` : '';
+          return (MARKCN[m.type] || m.type) + (mkLoc || mkAge ? `(${mkLoc}${mkAge})` : '');
+        }).join('、')}`
       : '，标记=无';
     return `- ${l.name}：清晰度=${l.clarity}，相对长度=${typeof l.length === 'number' ? l.length.toFixed(3) : l.length}` +
-      `${markTxt}${dgTxt}${segTxt}${shapeTxt}${clrNote}`;
+      `${markTxt}${dgTxt}${segTxt}${flowTxt}${shapeTxt}${clrNote}`;
   }).join('\n');
 
   const chuan = ef.chuan || {};
@@ -74,9 +110,20 @@ function buildPalmUserMessage(report) {
   const loTxt = Object.keys(lo).length ? Object.keys(lo).map(t => `${t}×${lo[t]}`).join('，') : '无';
 
   const lt = report.lifeTimeline || {};
-  const ltTxt = (lt.breaks && lt.breaks.length)
-    ? `生命线流年断口：${lt.breaks.map(b => `${b.from}-${b.to}岁`).join('、')}`
-    : '生命线流年：分段均匀、无明显断口';
+  // 生命线实测 0-78 岁流年带：按年龄升序排，逐带讲纹路状态
+  const bands = (lt.segments || [])
+    .map(s => {
+      const mm = String(s.age || '').split('-').map(x => parseInt(x, 10));
+      return { lo: mm[0] || 0, hi: mm[1] != null ? mm[1] : mm[0] || 0, state: s.state };
+    })
+    .sort((a, b) => a.lo - b.lo);
+  const bandTxt = bands.length
+    ? `生命线流年带（实测 0-78 岁、按纹路状态分 ${bands.length} 段）：${bands.map(s => `${s.lo}-${s.hi}岁${BANDCN[s.state] || s.state}`).join('→')}`
+    : '生命线流年带：无分段数据';
+  const ltTxt = bandTxt +
+    ((lt.breaks && lt.breaks.length)
+      ? `；断口年龄区间：${lt.breaks.map(b => `${b.from}-${b.to}岁`).join('、')}`
+      : '；无明显断口');
 
   const summary =
     `手掌：${hand.label === 'Left' ? '左手' : (hand.label === 'Right' ? '右手' : hand.label || '未知')}（识别置信 ${hand.confidence}%）\n` +
