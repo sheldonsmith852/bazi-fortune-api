@@ -91,11 +91,12 @@
         <figure><img id="imgAnno" alt="金色标注图"><figcaption>金色标注图</figcaption></figure>
       </div>
       <div class="legend">
-        <span>🟡 金色 = 掌纹皱褶</span>
-        <span>🔴 红框 = 断口 / 岛纹</span>
-        <span>🟣 品红 = 川字掌关系</span>
-        <span>🟡 黄 = 双太阳线</span>
-        <span>🩵 青 = 羽毛纹</span>
+        <span>金色 = 掌纹皱褶（真实沟壑像素）</span>
+        <span>青线 = 21 点手部骨架</span>
+        <span>蓝框 = 手掌 ROI 区域</span>
+        <span>金框 = 财富 / 吉祥图案</span>
+        <span>青点 = 拓扑分叉 / 交汇节点</span>
+        <span>红框 = 主线断口 / 岛纹</span>
       </div>
     </div>
 
@@ -247,18 +248,25 @@ function render(data, secs) {
     : '非典型（智慧线↔感情线 ' + (conf.mindHeartSeparate ? '分离' : '相连') +
       '，生命线↔智慧线 ' + (conf.lifeMindSeparate ? '分离' : '相连') + '）';
 
+  const lt = r.lifeTimeline || {};
+  const ltTxt = (lt.breaks && lt.breaks.length)
+    ? '断口 ' + lt.breaks.map(b => esc(b.from) + '-' + esc(b.to) + '岁').join('、')
+    : '分段均匀、无明显断口';
   $('tOverview').innerHTML =
     '<tr><td class="kv">手掌</td><td>' + esc(hand.label === 'Left' ? '左手' : (hand.label === 'Right' ? '右手' : hand.label)) +
       '（置信 ' + esc(hand.confidence) + '%）</td></tr>' +
     '<tr><td class="kv">照片质量分</td><td><b>' + esc(qs.score) + '</b>（' + esc(qs.label) + '）— ' + esc(qs.note) + '</td></tr>' +
     '<tr><td class="kv">感情线末端走向</td><td>' + esc(r.heartEndTrend) + '</td></tr>' +
     '<tr><td class="kv">事业线（纵脊）</td><td>' + esc(cs.label) + (cs.visible ? '（覆盖 ' + esc(cs.coverage) + '）' : '') + '</td></tr>' +
+    '<tr><td class="kv">生命线流年</td><td>' + ltTxt + '</td></tr>' +
     '<tr><td class="kv">服务端耗时</td><td>约 ' + secs + ' 秒</td></tr>';
 
-  let lh = '<tr><th>线</th><th>清晰度</th><th>相对长度</th><th>标记</th><th>置信</th></tr>';
+  let lh = '<tr><th>线</th><th>清晰度</th><th>相对长度</th><th>起止深浅</th><th>标记</th><th>置信</th></tr>';
   (r.lines || []).forEach(l => {
+    const dg = l.depthGradient || {};
+    const dgCell = dg.type ? esc(dg.type) + (dg.desc ? '（' + esc(String(dg.desc).slice(0, 10)) + '…）' : '') : '—';
     lh += '<tr><td>' + esc(l.name) + '</td><td>' + esc(l.clarity) + '</td><td>' +
-      esc(typeof l.length === 'number' ? l.length.toFixed(3) : l.length) + '</td><td>' +
+      esc(typeof l.length === 'number' ? l.length.toFixed(3) : l.length) + '</td><td>' + dgCell + '</td><td>' +
       (l.mark && l.mark !== 'none' ? esc(l.mark) : '—') + '</td><td>' + esc(l.confidence) + '</td></tr>';
   });
   $('tLines').innerHTML = lh;

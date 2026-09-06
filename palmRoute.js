@@ -30,10 +30,12 @@ function buildPalmUserMessage(report) {
   const lines = report.lines || [];
   const ef = report.extraFeatures || {};
 
-  const lineTxt = lines.map(l =>
-    `- ${l.name}：清晰度=${l.clarity}，相对长度=${typeof l.length === 'number' ? l.length.toFixed(3) : l.length}` +
-    `，标记=${l.mark && l.mark !== 'none' ? l.mark : '无'}`
-  ).join('\n');
+  const lineTxt = lines.map(l => {
+    const dg = l.depthGradient || {};
+    const dgTxt = dg.type ? `，起止深浅=${dg.type}（${dg.desc || ''}）` : '';
+    return `- ${l.name}：清晰度=${l.clarity}，相对长度=${typeof l.length === 'number' ? l.length.toFixed(3) : l.length}` +
+      `，标记=${l.mark && l.mark !== 'none' ? l.mark : '无'}${dgTxt}`;
+  }).join('\n');
 
   const chuan = ef.chuan || {};
   const sun = ef.sunDouble || {};
@@ -50,11 +52,17 @@ function buildPalmUserMessage(report) {
     ? Object.keys(markCount).map(t => `${t}×${markCount[t]}`).join('，')
     : '未检出';
 
+  const lt = report.lifeTimeline || {};
+  const ltTxt = (lt.breaks && lt.breaks.length)
+    ? `生命线流年断口：${lt.breaks.map(b => `${b.from}-${b.to}岁`).join('、')}`
+    : '生命线流年：分段均匀、无明显断口';
+
   const summary =
     `手掌：${hand.label === 'Left' ? '左手' : (hand.label === 'Right' ? '右手' : hand.label || '未知')}（识别置信 ${hand.confidence}%）\n` +
     `照片质量分：${qs.score}（${qs.label}）\n` +
     (report.heartEndTrend ? `感情线末端走向：${report.heartEndTrend}\n` : '') +
     (report.careerSpine ? `事业线（纵脊）：${report.careerSpine.label}\n` : '') +
+    `${ltTxt}\n` +
     `\n【主线】\n${lineTxt}\n\n【进阶纹向】\n${extraTxt}\n\n【掌中吉纹】共 ${marks.length} 处：${markTxt}`;
 
   return `以下是求问者手掌的结构化分析数据（由确定性算法提取，请勿修改其中任何数值）。\n` +
