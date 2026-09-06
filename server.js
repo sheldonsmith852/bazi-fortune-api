@@ -139,8 +139,8 @@ app.post('/api/bazi', async (c) => {
   return c.json({ chart, interpretation, llmNote });
 });
 
-// 手掌分析接口（子进程调 Python 引擎，详见 palmRoute.js）
-registerPalm(app, rateLimited);
+// 手掌分析接口（子进程调 Python 引擎，解读复用上面的 LLM 客户端，详见 palmRoute.js）
+registerPalm(app, rateLimited, llmClient, ZHIPU_MODEL);
 
 // === 静态页（前端完全内联，这里直接读 index.html） ===
 app.get('/', (c) => {

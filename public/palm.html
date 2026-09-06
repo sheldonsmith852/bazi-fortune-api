@@ -51,6 +51,13 @@
   details { margin-top:10px; }
   summary { cursor:pointer; font-size:13px; color:var(--sub); }
   pre { background:#f6f7f9; padding:10px; border-radius:8px; overflow:auto; font-size:11.5px; max-height:340px; }
+  .reading { font-size:15px; line-height:1.95; }
+  .reading h3 { font-size:16px; margin:18px 0 8px; color:var(--brand);
+                border-left:4px solid var(--brand); padding-left:10px; }
+  .reading h4 { font-size:14.5px; margin:14px 0 6px; color:var(--ink); }
+  .reading p { margin:10px 0; }
+  .reading b { color:var(--brand2); }
+  .reading .waiting { color:var(--sub); font-size:13px; }
 </style>
 </head>
 <body>
@@ -73,7 +80,12 @@
 
   <div id="result" class="hidden">
     <div class="card">
-      <h2>② 原图 / 金色标注图</h2>
+      <h2>② 手相解读</h2>
+      <div id="reading" class="reading"></div>
+    </div>
+
+    <div class="card">
+      <h2>③ 原图 / 金色标注图</h2>
       <div class="imgs">
         <figure><img id="imgOrig" alt="原图"><figcaption>原图</figcaption></figure>
         <figure><img id="imgAnno" alt="金色标注图"><figcaption>金色标注图</figcaption></figure>
@@ -88,28 +100,28 @@
     </div>
 
     <div class="card">
-      <h2>③ 概览</h2>
+      <h2>④ 概览</h2>
       <table id="tOverview"></table>
     </div>
 
     <div class="card">
-      <h2>④ 主线</h2>
+      <h2>⑤ 主线</h2>
       <table id="tLines"></table>
     </div>
 
     <div class="card">
-      <h2>⑤ 进阶纹向</h2>
+      <h2>⑥ 进阶纹向</h2>
       <table id="tExtra"></table>
     </div>
 
     <div class="card">
-      <h2>⑥ 掌中吉纹</h2>
+      <h2>⑦ 掌中吉纹</h2>
       <div class="pillars" id="pWealth"></div>
       <details><summary>展开完整列表</summary><table id="tWealth"></table></details>
     </div>
 
     <div class="card">
-      <h2>⑦ 原始数据</h2>
+      <h2>⑧ 原始数据</h2>
       <details><summary>展开 palm.json</summary><pre id="raw"></pre></details>
       <div class="disclaim">手相属民俗文化，仅供娱乐参照。照片自动识别，个别纹路若拍得偏淡可能略有出入；财富与健康请以专业意见为准。</div>
     </div>
@@ -125,6 +137,20 @@ let timer = null, t0 = 0;
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, m =>
     ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+// 极简 Markdown 渲染：解读文本由 LLM 生成，先转义 HTML 再做 Markdown 替换
+function mdToHtml(s) {
+  let h = esc(s);
+  h = h.replace(/^#{1,4}\s*(.+)$/gm, (m, t) => '<h3>' + t + '</h3>');
+  h = h.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  h = h.split(/\n{2,}/).map(blk => {
+    const t = blk.trim();
+    if (!t) return '';
+    if (/^<h3>/.test(t)) return t;
+    return '<p>' + t.replace(/\n/g, '<br>') + '</p>';
+  }).join('');
+  return h;
 }
 
 fileInput.addEventListener('change', () => {
@@ -206,6 +232,15 @@ function render(data, secs) {
 
   $('imgOrig').src = data.originalImage || '';
   $('imgAnno').src = data.annotatedImage || '';
+
+  // 解读：服务端按 palm-reader 技能的口吻指令 + 知识库生成
+  const readingEl = $('reading');
+  if (data.interpretation) {
+    readingEl.innerHTML = mdToHtml(data.interpretation);
+  } else {
+    readingEl.innerHTML = '<p class="waiting">' +
+      esc(data.llmNote || '本次未生成文字解读，可展开下方原始数据查看。') + '</p>';
+  }
 
   const conf = ef.chuan || {}, sun = ef.sunDouble || {}, fea = ef.heartFeather || {};
   const chuanTxt = conf.isChuan ? '<b style="color:var(--ok)">是</b>'
