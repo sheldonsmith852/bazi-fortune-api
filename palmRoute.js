@@ -47,10 +47,19 @@ function buildPalmUserMessage(report) {
 
   const marks = report.wealthMarks || [];
   const markCount = {};
-  marks.forEach(m => { const t = m.type || '未分类'; markCount[t] = (markCount[t] || 0) + 1; });
+  const lowConfMarks = [];
+  marks.forEach(m => {
+    const t = m.type || '未分类';
+    markCount[t] = (markCount[t] || 0) + 1;
+    const c = m.confidence;
+    if ((typeof c === 'number' && c < 0.6) || c === '低') lowConfMarks.push(`${t}(${c})`);
+  });
   const markTxt = Object.keys(markCount).length
     ? Object.keys(markCount).map(t => `${t}×${markCount[t]}`).join('，')
     : '未检出';
+  const markNote = lowConfMarks.length
+    ? `（注意：其中 ${lowConfMarks.join('、')} 置信<0.6，多为拓扑节点噪声，按知识库不应视为吉纹或据此断运势，只可说"纹理交汇较密"）`
+    : '';
 
   const lt = report.lifeTimeline || {};
   const ltTxt = (lt.breaks && lt.breaks.length)
@@ -63,7 +72,7 @@ function buildPalmUserMessage(report) {
     (report.heartEndTrend ? `感情线末端走向：${report.heartEndTrend}\n` : '') +
     (report.careerSpine ? `事业线（纵脊）：${report.careerSpine.label}\n` : '') +
     `${ltTxt}\n` +
-    `\n【主线】\n${lineTxt}\n\n【进阶纹向】\n${extraTxt}\n\n【掌中吉纹】共 ${marks.length} 处：${markTxt}`;
+    `\n【主线】\n${lineTxt}\n\n【进阶纹向】\n${extraTxt}\n\n【掌中吉纹】共 ${marks.length} 处：${markTxt}${markNote}`;
 
   return `以下是求问者手掌的结构化分析数据（由确定性算法提取，请勿修改其中任何数值）。\n` +
     `请严格依据系统提示词中的【手相权威知识库】撰写解读，只可用其中的传统说法，不得超纲编造。\n\n` +
