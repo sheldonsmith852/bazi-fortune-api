@@ -20,6 +20,7 @@ const { cors } = require('hono/cors');
 const { computeBazi } = require('./baziEngine');
 const { SYSTEM_PROMPT } = require('./interpretation_prompt');
 const { registerPalm } = require('./palmRoute');
+const { registerConsult } = require('./consultRoute');
 
 const app = new Hono();
 const PORT = Number(process.env.PORT) || 3000;
@@ -141,6 +142,9 @@ app.post('/api/bazi', async (c) => {
 
 // 手掌分析接口（子进程调 Python 引擎，解读复用上面的 LLM 客户端，详见 palmRoute.js）
 registerPalm(app, rateLimited, llmClient, ZHIPU_MODEL);
+
+// 八字 + 手相「合参」接口（同进程算八字 + 复用掌纹引擎 + 合参 LLM 解读，详见 consultRoute.js）
+registerConsult(app, rateLimited, llmClient, ZHIPU_MODEL);
 
 // === 静态页（前端完全内联，这里直接读 index.html） ===
 app.get('/', (c) => {

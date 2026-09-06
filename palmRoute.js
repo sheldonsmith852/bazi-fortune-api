@@ -75,6 +75,64 @@ async function getPalmInterpretation(llmClient, model, report) {
   return resp.choices[0].message.content;
 }
 
+/**
+ * 运行掌纹引擎：写临时目录 -> 子进程调 Python -> 读 palm.json + annotated.png
+ * 并发保护由模块级 active / MAX_CONCURRENT 承担；处理完即删临时目录（零留存）。
+ * 返回 { report, annotatedImage, originalImage }；失败抛错（e.code 可能为 503）。
+ * 被 /api/palm 与 /api/consult 共用。
+ */
+async function runPalmEngine(buf) {
+  if (active >= MAX_CONCURRENT) {
+    const e = new Error('当前分析排队已满（服务器资源有限），请稍后再试。');
+    e.code = 503;
+    throw e;
+  }
+  active++;
+  let tmpDir = null;
+  try {
+    tmpDir = fs.mkdtempSync('/tmp/palm-');
+    const ext = (buf[0] === 0x89 && buf[1] === 0x50) ? 'png' : 'jpg';
+    const imgPath = path.join(tmpDir, 'hand.' + ext);
+    fs.writeFileSync(imgPath, buf);
+
+    await new Promise((resolve, reject) => {
+      execFile(
+        PYTHON,
+        [ENGINE, imgPath, '-o', tmpDir],
+        { timeout: 120000, cwd: '/opt/palm-engine' },
+        (err, stdout, stderr) => {
+          if (err) return reject(new Error((stderr || err.message || '').toString().slice(0, 500)));
+          resolve();
+        }
+      );
+    });
+
+    const jsonPath = path.join(tmpDir, 'palm.json');
+    const pngPath = path.join(tmpDir, 'annotated.png');
+    if (!fs.existsSync(jsonPath)) {
+      throw new Error('引擎未产出 palm.json，可能照片无法识别手掌或图片过暗');
+    }
+    const report = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+
+    let annotatedImage = null;
+    if (fs.existsSync(pngPath)) {
+      annotatedImage = 'data:image/png;base64,' + fs.readFileSync(pngPath).toString('base64');
+    }
+    // 原图也回传，方便前端做"划线 vs 原图"对照（仍在 tmpDir 内，finally 一并删除）
+    const originalImage = 'data:image/' + ext + ';base64,' + buf.toString('base64');
+
+    return { report, annotatedImage, originalImage };
+  } finally {
+    active--;
+    // 零留存：处理完即删临时目录（含原图 + 引擎产物）
+    if (tmpDir) {
+      try {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      } catch (_) {}
+    }
+  }
+}
+
 function registerPalm(app, rateLimited, llmClient, model) {
   app.post('/api/palm', async (c) => {
     const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
@@ -93,72 +151,30 @@ function registerPalm(app, rateLimited, llmClient, model) {
       return c.json({ error: '缺少 image 字段（multipart 文件）' }, 400);
     }
 
-    // 并发保护：2C4G 与 bazi、薅羊毛日报共用；每个分析会单起一个 MediaPipe 进程
-    if (active >= MAX_CONCURRENT) {
-      return c.json({ error: '当前分析排队已满（服务器资源有限），请稍后再试。' }, 503);
-    }
-    active++;
-
-    let tmpDir = null;
+    let palm;
     try {
-      tmpDir = fs.mkdtempSync('/tmp/palm-');
-      const ext = (file.name && /\.png$/i.test(file.name)) ? 'png' : 'jpg';
-      const imgPath = path.join(tmpDir, 'hand.' + ext);
-
       const buf = Buffer.from(await file.arrayBuffer());
-      fs.writeFileSync(imgPath, buf);
-
-      await new Promise((resolve, reject) => {
-        execFile(
-          PYTHON,
-          [ENGINE, imgPath, '-o', tmpDir],
-          { timeout: 120000, cwd: '/opt/palm-engine' },
-          (err, stdout, stderr) => {
-            if (err) return reject(new Error((stderr || err.message || '').toString().slice(0, 500)));
-            resolve();
-          }
-        );
-      });
-
-      const jsonPath = path.join(tmpDir, 'palm.json');
-      const pngPath = path.join(tmpDir, 'annotated.png');
-      if (!fs.existsSync(jsonPath)) {
-        return c.json({ error: '引擎未产出 palm.json，可能照片无法识别手掌或图片过暗' }, 422);
-      }
-      const report = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-
-      let annotatedImage = null;
-      if (fs.existsSync(pngPath)) {
-        annotatedImage = 'data:image/png;base64,' + fs.readFileSync(pngPath).toString('base64');
-      }
-      // 原图也回传，方便前端做"划线 vs 原图"对照（仍在 tmpDir 内，finally 一并删除）
-      const originalImage = 'data:image/' + ext + ';base64,' + fs.readFileSync(imgPath).toString('base64');
-
-      // 解读层：复用 bazi 的 LLM 客户端，按 palm-reader 技能的口吻指令 + 知识库生成算命先生式解读
-      let interpretation = null;
-      let llmNote = null;
-      if (llmClient) {
-        try {
-          interpretation = await getPalmInterpretation(llmClient, model, report);
-        } catch (e) {
-          llmNote = '解读生成失败：' + e.message;
-        }
-      } else {
-        llmNote = '服务端未配置 ZHIPU_API_KEY，仅返回结构化数据，无文字解读。';
-      }
-
-      return c.json({ report, interpretation, llmNote, annotatedImage, originalImage });
+      palm = await runPalmEngine(buf);
     } catch (e) {
-      return c.json({ error: '掌纹分析失败：' + e.message }, 500);
-    } finally {
-      active--;
-      // 零留存：处理完即删临时目录（含原图 + 引擎产物）
-      if (tmpDir) {
-        try {
-          fs.rmSync(tmpDir, { recursive: true, force: true });
-        } catch (_) {}
-      }
+      const msg = (e && e.message) || String(e);
+      const code = e && e.code === 503 ? 503 : (/无法识别|过暗|palm\.json/.test(msg) ? 422 : 500);
+      return c.json({ error: '掌纹分析失败：' + msg }, code);
     }
+
+    // 解读层：复用 bazi 的 LLM 客户端，按 palm-reader 技能的口吻指令 + 知识库生成算命先生式解读
+    let interpretation = null;
+    let llmNote = null;
+    if (llmClient) {
+      try {
+        interpretation = await getPalmInterpretation(llmClient, model, palm.report);
+      } catch (e) {
+        llmNote = '解读生成失败：' + (e && e.message);
+      }
+    } else {
+      llmNote = '服务端未配置 ZHIPU_API_KEY，仅返回结构化数据，无文字解读。';
+    }
+
+    return c.json({ report: palm.report, interpretation, llmNote, annotatedImage: palm.annotatedImage, originalImage: palm.originalImage });
   });
   // 手掌上传页（手机友好）
   app.get('/palm', (c) => {
@@ -171,4 +187,4 @@ function registerPalm(app, rateLimited, llmClient, model) {
   });
 }
 
-module.exports = { registerPalm };
+module.exports = { registerPalm, runPalmEngine };
