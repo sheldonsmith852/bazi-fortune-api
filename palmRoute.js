@@ -33,8 +33,10 @@ function buildPalmUserMessage(report) {
   const lineTxt = lines.map(l => {
     const dg = l.depthGradient || {};
     const dgTxt = dg.type ? `，起止深浅=${dg.type}（${dg.desc || ''}）` : '';
+    const clrNote = l.clarity === '清晰' ? '' :
+      `（讲述此线时须如实用「${l.clarity}清晰」表述，严禁拔高成"清晰"）`;
     return `- ${l.name}：清晰度=${l.clarity}，相对长度=${typeof l.length === 'number' ? l.length.toFixed(3) : l.length}` +
-      `，标记=${l.mark && l.mark !== 'none' ? l.mark : '无'}${dgTxt}`;
+      `，标记=${l.mark && l.mark !== 'none' ? l.mark : '无'}${dgTxt}${clrNote}`;
   }).join('\n');
 
   const chuan = ef.chuan || {};
@@ -86,7 +88,7 @@ async function getPalmInterpretation(llmClient, model, report) {
       { role: 'system', content: PALM_SYSTEM_PROMPT },
       { role: 'user', content: buildPalmUserMessage(report) }
     ],
-    temperature: 0.6,
+    temperature: 0.4,
     max_tokens: 2048
   });
   return resp.choices[0].message.content;
