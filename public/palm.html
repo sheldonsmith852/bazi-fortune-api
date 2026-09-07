@@ -144,12 +144,13 @@ function esc(s) {
 // 极简 Markdown 渲染：解读文本由 LLM 生成，先转义 HTML 再做 Markdown 替换
 function mdToHtml(s) {
   let h = esc(s);
-  h = h.replace(/^#{1,4}\s*(.+)$/gm, (m, t) => '<h3>' + t + '</h3>');
+  h = h.replace(/^#{1,2}\s*(.+)$/gm, (m, t) => '<h3>' + t + '</h3>');
+  h = h.replace(/^#{3,4}\s*(.+)$/gm, (m, t) => '<h4>' + t + '</h4>');
   h = h.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
   h = h.split(/\n{2,}/).map(blk => {
     const t = blk.trim();
     if (!t) return '';
-    if (/^<h3>/.test(t)) return t;
+    if (/^<h[34]>/.test(t)) return t;
     return '<p>' + t.replace(/\n/g, '<br>') + '</p>';
   }).join('');
   return h;
