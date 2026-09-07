@@ -13,6 +13,7 @@ const path = require('path');
 const { execFile } = require('child_process');
 
 const { SYSTEM_PROMPT: PALM_SYSTEM_PROMPT } = require('./palm_interpretation_prompt');
+const { enforceRemedy } = require('./llmRemedy');
 
 const PYTHON = '/opt/palm-venv/bin/python';
 const ENGINE = '/opt/palm-engine/palm_read.py';
@@ -177,16 +178,13 @@ function annotateFlowAges(report) {
 }
 
 async function getPalmInterpretation(llmClient, model, report) {
-  const resp = await llmClient.chat.completions.create({
-    model: model,
-    messages: [
-      { role: 'system', content: PALM_SYSTEM_PROMPT },
-      { role: 'user', content: buildPalmUserMessage(report) }
-    ],
-    temperature: 0.3,
-    max_tokens: 2048
-  });
-  return resp.choices[0].message.content;
+  const messages = [
+    { role: 'system', content: PALM_SYSTEM_PROMPT },
+    { role: 'user', content: buildPalmUserMessage(report) }
+  ];
+  // 阈值 4：四段流年各需一句含宜/忌的破解；不足则触发一次纠正重试（见 llmRemedy.js）
+  const { text } = await enforceRemedy(llmClient, model, messages, 4, { maxTokens: 2048, temperature: 0.2 });
+  return text;
 }
 
 /**

@@ -12,6 +12,7 @@ const path = require('path');
 const { computeBazi } = require('./baziEngine');
 const { runPalmEngine, buildPalmSummary: buildPalmSummaryRich } = require('./palmRoute');
 const { SYSTEM_PROMPT: CONSULT_SYSTEM_PROMPT } = require('./consult_interpretation_prompt');
+const { enforceRemedy } = require('./llmRemedy');
 
 // === 把结构化数据拼成给 LLM 的 user 消息（双份摘要 + 原始 JSON） ===
 function buildBaziSummary(c) {
@@ -40,16 +41,13 @@ function buildConsultUserMessage(chart, report) {
 }
 
 async function getConsultInterpretation(llmClient, model, chart, report) {
-  const resp = await llmClient.chat.completions.create({
-    model,
-    messages: [
-      { role: 'system', content: CONSULT_SYSTEM_PROMPT },
-      { role: 'user', content: buildConsultUserMessage(chart, report) }
-    ],
-    temperature: 0.5,
-    max_tokens: 4095
-  });
-  return resp.choices[0].message.content;
+  const messages = [
+    { role: 'system', content: CONSULT_SYSTEM_PROMPT },
+    { role: 'user', content: buildConsultUserMessage(chart, report) }
+  ];
+  // 阈值 3：事业/财运/感情/性格 四路 + 第六节需含宜/忌；不足则触发一次纠正重试
+  const { text } = await enforceRemedy(llmClient, model, messages, 3, { maxTokens: 4095, temperature: 0.3 });
+  return text;
 }
 
 function registerConsult(app, rateLimited, llmClient, model) {
